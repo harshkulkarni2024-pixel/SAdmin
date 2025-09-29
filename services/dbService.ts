@@ -4,6 +4,9 @@ import { supabase } from './supabaseClient';
 // --- Constants ---
 const ADMIN_IDS = [1337]; 
 const ADMIN_ACCESS_CODE = 'w1';
+const TEST_USER_ACCESS_CODE = 'T1';
+const TEST_USER_ID = 1;
+
 
 // --- Helper Functions ---
 const handleError = (error: any, context: string) => {
@@ -19,6 +22,8 @@ export const verifyAccessCode = async (code: string, isSessionLogin: boolean = f
     
     if (code === ADMIN_ACCESS_CODE && !isSessionLogin) {
         query = supabase.from('users').select('*').eq('user_id', ADMIN_IDS[0]).single();
+    } else if (code === TEST_USER_ACCESS_CODE && !isSessionLogin) {
+        query = supabase.from('users').select('*').eq('user_id', TEST_USER_ID).single();
     } else if (isSessionLogin) {
         const userId = parseInt(code, 10);
         if (isNaN(userId)) return null;
