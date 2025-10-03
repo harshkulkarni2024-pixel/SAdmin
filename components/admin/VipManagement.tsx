@@ -57,11 +57,25 @@ const VipManagement: React.FC<VipManagementProps> = ({ onVipUpdate }) => {
             }
             
         } catch (error) {
-            setNotification('خطا در ذخیره تغییرات.');
+            const errorMessage = (error as Error).message;
+            let userFriendlyMessage = `خطا در ذخیره تغییرات: ${errorMessage}`;
+    
+            if (errorMessage.includes('violates row-level security policy')) {
+                userFriendlyMessage = `خطای دسترسی: RLS (Row-Level Security) فعال است و به شما اجازه ویرایش کاربران را نمی‌دهد.
+
+لطفاً یک پالیسی (Policy) برای UPDATE در جدول \`users\` ایجاد کنید که به مدیر سیستم اجازه ویرایش دهد.`;
+            } else if (errorMessage.includes('column "is_vip" of relation "users" does not exist')) {
+                userFriendlyMessage = `خطای پایگاه داده: ستون \`is_vip\` در جدول \`users\` وجود ندارد.
+
+لطفاً با اجرای دستور SQL زیر در Supabase SQL Editor این ستون را اضافه کنید:
+\`ALTER TABLE public.users ADD COLUMN is_vip BOOLEAN DEFAULT false;\``;
+            }
+    
+            setNotification(userFriendlyMessage);
             console.error(error);
         } finally {
             setIsSaving(false);
-            setTimeout(() => setNotification(''), 3000);
+            setTimeout(() => setNotification(''), 5000);
         }
     };
 
@@ -75,7 +89,7 @@ const VipManagement: React.FC<VipManagementProps> = ({ onVipUpdate }) => {
             <p className="text-slate-400 mb-6">کاربرانی که می‌خواهید دسترسی VIP داشته باشند را انتخاب کنید.</p>
 
             {notification && (
-                <div className={`px-4 py-3 rounded-lg mb-6 text-center ${notification.includes('خطا') ? 'bg-red-900/50 text-red-300' : 'bg-green-900/50 text-green-300'}`}>
+                <div className={`px-4 py-3 rounded-lg mb-6 text-right whitespace-pre-line ${notification.includes('خطا') ? 'bg-red-900/50 text-red-300' : 'bg-green-900/50 text-green-300'}`}>
                     {notification}
                 </div>
             )}

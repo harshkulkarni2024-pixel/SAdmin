@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { User, ChatMessage } from '../../types';
-import { startChatSession } from '../../services/geminiService';
+import { startChatSession, handleGeminiError } from '../../services/geminiService';
 import { incrementUsage, getChatHistory, saveChatHistory } from '../../services/dbService';
 import { Icon } from '../common/Icon';
 import { VoiceInput } from '../common/VoiceInput';
@@ -94,14 +93,14 @@ const FreeChat: React.FC<FreeChatProps> = ({ user, onUserUpdate }) => {
             await saveChatHistory(user.user_id, [...currentMessages, { sender: 'ai', text: fullAiResponse }]);
 
         } catch (error) {
-             const errorMessage = 'متاسفم، مشکلی در ارتباط با هوش مصنوعی پیش آمد. لطفاً دوباره تلاش کنید.';
+             const formattedError = handleGeminiError(error);
              setMessages(prev => {
                 const lastIndex = prev.length - 1;
                 const updatedMessages = [...prev];
-                updatedMessages[lastIndex] = { ...updatedMessages[lastIndex], text: errorMessage };
+                updatedMessages[lastIndex] = { ...updatedMessages[lastIndex], text: formattedError };
                 return updatedMessages;
             });
-            await saveChatHistory(user.user_id, [...currentMessages, { sender: 'ai', text: errorMessage }]);
+            await saveChatHistory(user.user_id, [...currentMessages, { sender: 'ai', text: formattedError }]);
         } finally {
             setIsLoading(false);
         }

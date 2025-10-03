@@ -11,7 +11,7 @@ interface UserManagementProps {
 const UserManagement: React.FC<UserManagementProps> = ({ onSelectUser, onLogout }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newUser, setNewUser] = useState({ name: '', code: '' });
+  const [newUser, setNewUser] = useState({ name: '', code: '', is_vip: false });
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
   const refreshUsers = useCallback(async () => {
@@ -32,14 +32,14 @@ const UserManagement: React.FC<UserManagementProps> = ({ onSelectUser, onLogout 
           setNotification({ type: 'error', message: 'نام و کد دسترسی هر دو الزامی هستند.' });
           return;
       }
-      const result = await db.addUser(newUser.name, newUser.code);
+      const result = await db.addUser(newUser.name, newUser.code, newUser.is_vip);
       
       setNotification({ type: result.success ? 'success' : 'error', message: result.message });
       
       if (result.success) {
           refreshUsers();
           setShowAddModal(false);
-          setNewUser({ name: '', code: '' });
+          setNewUser({ name: '', code: '', is_vip: false });
           setTimeout(() => setNotification(null), 3000);
       }
   };
@@ -115,6 +115,18 @@ const UserManagement: React.FC<UserManagementProps> = ({ onSelectUser, onLogout 
             <div className="space-y-4">
               <input type="text" placeholder="نام کامل" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} className="w-full bg-slate-700 p-2 rounded text-white" />
               <input type="text" placeholder="کد دسترسی" value={newUser.code} onChange={e => setNewUser({...newUser, code: e.target.value})} className="w-full bg-slate-700 p-2 rounded text-white" />
+              <div className="flex items-center">
+                  <input 
+                      id="vip-checkbox" 
+                      type="checkbox" 
+                      checked={newUser.is_vip}
+                      onChange={e => setNewUser({...newUser, is_vip: e.target.checked})}
+                      className="w-4 h-4 text-violet-600 bg-slate-700 border-slate-600 rounded focus:ring-violet-500 focus:ring-2" 
+                  />
+                  <label htmlFor="vip-checkbox" className="ms-2 text-sm font-medium text-slate-300">
+                      افزودن به عنوان کاربر VIP
+                  </label>
+              </div>
             </div>
             <div className="flex justify-end gap-4 mt-6">
               <button onClick={() => {setShowAddModal(false); setNotification(null);}} className="bg-slate-600 px-4 py-2 rounded-lg hover:bg-slate-500">لغو</button>

@@ -9,7 +9,6 @@ interface WelcomeScreenProps {
 }
 
 const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, error, setError }) => {
-  const [isAdminLogin, setIsAdminLogin] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -26,55 +25,30 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, error, setError 
     }
     setIsLoading(false);
   };
-  
-  const toggleLoginMode = () => {
-    setIsAdminLogin(!isAdminLogin);
-    setInputValue('');
-    setError('');
-  };
 
   return (
     <div 
       className="flex items-center justify-center min-h-screen bg-slate-900"
     >
-      <div className="relative w-full max-w-sm p-8 space-y-4 bg-slate-800 rounded-2xl shadow-2xl border border-slate-700">
+      <div className="w-full max-w-sm p-8 space-y-4 bg-slate-800 rounded-2xl shadow-2xl border border-slate-700">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-white tracking-tight">
             سوپر ادمین آیتم
           </h1>
+          <p className="mt-2 text-slate-300">برای ورود، کد دسترسی یا رمز عبور مدیر را وارد کنید</p>
           
           <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-              {!isAdminLogin ? (
-                <>
-                  <p className="mt-2 text-slate-300">برای ورود کد دسترسی خود را وارد کنید</p>
-                  <input
-                    id="access-code-input"
-                    name="access-code"
-                    type="text"
-                    autoComplete="off"
-                    required
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    className="block w-full px-4 py-3 text-white text-center bg-slate-700 border border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500 sm:text-sm"
-                    placeholder="کد دسترسی"
-                  />
-                </>
-              ) : (
-                <>
-                  <p className="mt-2 text-slate-300">رمز عبور مدیر را وارد کنید</p>
-                  <input
-                    id="admin-password-input"
-                    name="admin-password"
-                    type="password"
-                    autoComplete="current-password"
-                    required
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    className="block w-full px-4 py-3 text-white text-center bg-slate-700 border border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500 sm:text-sm"
-                    placeholder="••••••••"
-                  />
-                </>
-              )}
+              <input
+                id="access-code-input"
+                name="access-code"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                className="block w-full px-4 py-3 text-white text-center bg-slate-700 border border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500 sm:text-sm"
+                placeholder="••••••••"
+              />
 
             {error && <p className="text-sm text-red-400 text-center whitespace-pre-line">{error}</p>}
 
@@ -89,16 +63,6 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, error, setError 
             </div>
           </form>
         </div>
-        
-        <div className="absolute -bottom-8 right-0 left-0 text-center">
-            <button
-              onClick={toggleLoginMode}
-              className="text-xs font-medium text-slate-400 hover:text-violet-300 transition-colors"
-            >
-              {isAdminLogin ? 'بازگشت به ورود کاربر' : 'ورود مدیر'}
-            </button>
-        </div>
-
       </div>
     </div>
   );

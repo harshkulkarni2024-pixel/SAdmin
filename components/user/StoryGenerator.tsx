@@ -14,6 +14,7 @@ interface StoryGeneratorProps {
 
 const StoryGenerator: React.FC<StoryGeneratorProps> = ({ user, onUserUpdate }) => {
     const [idea, setIdea] = useState('');
+    const [yesterdayFeedback, setYesterdayFeedback] = useState('');
     const [currentScenario, setCurrentScenario] = useState('');
     const [history, setHistory] = useState<{ id: number; content: string }[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -44,7 +45,7 @@ const StoryGenerator: React.FC<StoryGeneratorProps> = ({ user, onUserUpdate }) =
         setCurrentScenario('');
         try {
             let fullScenario = '';
-            const stream = generateStoryScenarioStream(user.about_info || '', idea);
+            const stream = generateStoryScenarioStream(user.about_info || '', idea, yesterdayFeedback);
             for await (const chunk of stream) {
                 fullScenario += chunk;
                 setCurrentScenario(prev => prev + chunk);
@@ -59,6 +60,7 @@ const StoryGenerator: React.FC<StoryGeneratorProps> = ({ user, onUserUpdate }) =
         } finally {
             setIsLoading(false);
             setIdea('');
+            setYesterdayFeedback('');
         }
     };
 
@@ -67,7 +69,7 @@ const StoryGenerator: React.FC<StoryGeneratorProps> = ({ user, onUserUpdate }) =
     return (
         <div className="max-w-3xl mx-auto animate-fade-in">
             <h1 className="text-3xl font-bold text-white mb-2">تولیدکننده سناریو استوری</h1>
-            <p className="text-sm text-slate-400 mb-6">محدودیت روزانه: {user.story_requests} / 2. ایده اصلی استوری امروزت چیه؟</p>
+            <p className="text-sm text-slate-400 mb-6">محدودیت روزانه: {user.story_requests} / 2. با ارائه بازخورد از استوری دیروز، به هوش مصنوعی کمک کن سناریوی بهتری برای امروزت بنویسه.</p>
 
             {isLimitReached && !isLoading && !currentScenario && (
                 <div className="bg-yellow-900/50 border border-yellow-700 text-yellow-300 px-4 py-3 rounded-lg text-center">
@@ -76,16 +78,39 @@ const StoryGenerator: React.FC<StoryGeneratorProps> = ({ user, onUserUpdate }) =
             )}
 
             {!isLimitReached && (
-                 <div className="space-y-4">
-                    <div className="relative">
-                        <textarea
-                            value={idea}
-                            onChange={(e) => setIdea(e.target.value)}
-                            placeholder="مثلاً: آنباکسینگ محصول جدید، یک روز از زندگی من، یا پاسخ به سوالات مخاطبان..."
-                            className="w-full h-32 p-4 pe-4 ps-20 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-violet-500 focus:outline-none resize-none"
-                            disabled={isLoading}
-                        />
-                        <VoiceInput onTranscript={setIdea} disabled={isLoading} />
+                 <div className="space-y-6">
+                    <div>
+                        <label htmlFor="yesterdayFeedback" className="block text-sm font-medium text-slate-300 mb-2">
+                             استوری دیروزت چطور بود؟ (اختیاری)
+                            <span className="text-xs text-slate-400 block">اگه درموردش بهم بگی، میتونم در استوری امروزت خیلی بهتر کمکت کنم.</span>
+                        </label>
+                        <div className="relative">
+                            <textarea
+                                id="yesterdayFeedback"
+                                value={yesterdayFeedback}
+                                onChange={(e) => setYesterdayFeedback(e.target.value)}
+                                placeholder="مثلاً: بازخوردها عالی بود، اما بازدید کمی گرفت."
+                                className="w-full h-24 p-4 pe-4 ps-20 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-violet-500 focus:outline-none resize-none"
+                                disabled={isLoading}
+                            />
+                            <VoiceInput onTranscript={setYesterdayFeedback} disabled={isLoading} />
+                        </div>
+                    </div>
+                    <div>
+                        <label htmlFor="idea" className="block text-sm font-medium text-slate-300 mb-2">
+                            ایده اصلی استوری امروزت چیه؟
+                        </label>
+                         <div className="relative">
+                            <textarea
+                                id="idea"
+                                value={idea}
+                                onChange={(e) => setIdea(e.target.value)}
+                                placeholder="مثلاً: آنباکسینگ محصول جدید، یک روز از زندگی من، یا پاسخ به سوالات مخاطبان..."
+                                className="w-full h-32 p-4 pe-4 ps-20 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-violet-500 focus:outline-none resize-none"
+                                disabled={isLoading}
+                            />
+                            <VoiceInput onTranscript={setIdea} disabled={isLoading} />
+                        </div>
                     </div>
                     <button
                         onClick={handleGenerate}

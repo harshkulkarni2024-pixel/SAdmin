@@ -1,4 +1,3 @@
-
 import { User, PostScenario, Plan, Report, Caption, PostIdea, BroadcastMessage, ActivityLog, ChatMessage } from '../types';
 import { supabase, SUPABASE_INIT_ERROR } from './supabaseClient';
 
@@ -113,6 +112,15 @@ export const verifyAccessCode = async (code: string, isSessionLogin: boolean = f
     }
 
     if (!user) {
+        // Check for admin code in DB
+        if (!isSessionLogin && code === ADMIN_DB_ACCESS_CODE) {
+             const { data: adminUser, error: adminError } = await supabase.from('users').select('*').eq('user_id', ADMIN_IDS[0]).single();
+             if (adminError) {
+                 handleError(adminError, 'verifyAccessCode:admin');
+                 throw new Error(`خطای پایگاه داده هنگام بررسی مدیر: ${adminError.message}`);
+             }
+             return adminUser;
+        }
         return null;
     }
 
@@ -178,7 +186,7 @@ export const getUserById = async (userId: number): Promise<User | null> => {
     return data;
 };
 
-export const addUser = async (fullName: string, accessCode: string): Promise<{ success: boolean, message: string }> => {
+export const addUser = async (fullName: string, accessCode: string, isVip: boolean): Promise<{ success: boolean, message: string }> => {
     if (!supabase) return { success: false, message: SUPABASE_INIT_ERROR };
     
     const { data: existingUser, error: checkError } = await supabase.from('users').select('user_id').eq('access_code', accessCode).single();
@@ -200,7 +208,7 @@ export const addUser = async (fullName: string, accessCode: string): Promise<{ s
         last_request_date: new Date().toISOString().split('T')[0],
         last_weekly_reset_date: new Date().toISOString().split('T')[0],
         about_info: '',
-        is_vip: false,
+        is_vip: isVip,
     };
     
     // Generate a unique user_id that isn't an admin id
@@ -250,7 +258,10 @@ export const updateUserVipStatus = async (userId: number, isVip: boolean): Promi
     
     if (!supabase) throw new Error(SUPABASE_INIT_ERROR);
     const { error } = await supabase.from('users').update({ is_vip: isVip }).eq('user_id', userId);
-    if (error) handleError(error, 'updateUserVipStatus');
+    if (error) {
+        handleError(error, 'updateUserVipStatus');
+        throw error;
+    }
 }
 
 
