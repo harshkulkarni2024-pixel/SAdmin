@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { User } from '../../types';
 import { generateImage, editImage } from '../../services/geminiService';
@@ -105,13 +106,7 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({ user, onUserUpdate }) =
             await incrementUsage(user.user_id, 'image');
             onUserUpdate();
         } catch (e: any) {
-            let errorMessage = e.message || 'تولید یا ویرایش عکس با خطا مواجه شد.';
-            if (errorMessage.includes('429') || /quota/i.test(errorMessage)) {
-                errorMessage = `متاسفانه، شما به محدودیت استفاده از سرویس هوش مصنوعی رسیده‌اید (Quota Exceeded).
-                
-این یک خطای فنی در برنامه نیست، بلکه به این معنی است که محدودیت‌های پلن رایگان شما در Google AI به پایان رسیده است. لطفاً برای اطلاعات بیشتر صورتحساب و پلن خود را در وب‌سایت Google AI بررسی کنید.`;
-            }
-            setError(errorMessage);
+            setError(e.message || 'تولید یا ویرایش عکس با خطا مواجه شد.');
         } finally {
             setIsLoading(false);
         }

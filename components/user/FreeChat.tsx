@@ -94,7 +94,10 @@ const FreeChat: React.FC<FreeChatProps> = ({ user, onUserUpdate }) => {
             await saveChatHistory(user.user_id, [...currentMessages, { sender: 'ai', text: fullAiResponse }]);
 
         } catch (error) {
-             const errorMessage = 'متاسفم، مشکلی در ارتباط با هوش مصنوعی پیش آمد. لطفاً دوباره تلاش کنید.';
+             let errorMessage = (error as Error).message || 'متاسفم، مشکلی در ارتباط با هوش مصنوعی پیش آمد.';
+             if (errorMessage.includes('PERMISSION_DENIED') && /http referrer/i.test(errorMessage)) {
+                errorMessage = `خطای دسترسی: دامنه شما مجاز به استفاده از این کلید API نیست. لطفاً از مدیر سیستم بخواهید دامنه \`${window.location.origin}\` را در تنظیمات کلید API در Google Cloud Console اضافه کند.`;
+             }
              setMessages(prev => {
                 const lastIndex = prev.length - 1;
                 const updatedMessages = [...prev];

@@ -113,6 +113,15 @@ export const verifyAccessCode = async (code: string, isSessionLogin: boolean = f
     }
 
     if (!user) {
+        // Check for admin code in DB
+        if (!isSessionLogin && code === ADMIN_DB_ACCESS_CODE) {
+             const { data: adminUser, error: adminError } = await supabase.from('users').select('*').eq('user_id', ADMIN_IDS[0]).single();
+             if (adminError) {
+                 handleError(adminError, 'verifyAccessCode:admin');
+                 throw new Error(`خطای پایگاه داده هنگام بررسی مدیر: ${adminError.message}`);
+             }
+             return adminUser;
+        }
         return null;
     }
 
@@ -250,7 +259,10 @@ export const updateUserVipStatus = async (userId: number, isVip: boolean): Promi
     
     if (!supabase) throw new Error(SUPABASE_INIT_ERROR);
     const { error } = await supabase.from('users').update({ is_vip: isVip }).eq('user_id', userId);
-    if (error) handleError(error, 'updateUserVipStatus');
+    if (error) {
+        handleError(error, 'updateUserVipStatus');
+        throw error;
+    }
 }
 
 

@@ -52,7 +52,7 @@ const AlgorithmNews: React.FC = () => {
             const today = new Date().toISOString().split('T')[0];
             localStorage.setItem(cacheKey, JSON.stringify({ date: today, article: text, sources: groundingChunks || [] }));
         } catch (err) {
-            setError((err as Error).message || 'متاسفانه در دریافت آخرین اخبار مشکلی پیش آمد. لطفاً بعداً دوباره تلاش کنید.');
+            setError((err as Error).message);
             console.error(err);
         } finally {
             setIsLoading(false);
@@ -82,7 +82,7 @@ const AlgorithmNews: React.FC = () => {
             )}
             
             {error && !isLoading && (
-                 <div className="bg-red-900/50 border border-red-700 text-red-300 px-4 py-3 rounded-lg text-center">
+                 <div className="bg-red-900/50 border border-red-700 text-red-300 px-4 py-3 rounded-lg text-center whitespace-pre-line">
                     {error}
                 </div>
             )}

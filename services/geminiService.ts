@@ -1,3 +1,4 @@
+
 // FIX: Removed vite/client reference. Types for import.meta.env are now provided globally in types.ts.
 import { GoogleGenAI, Modality, Chat } from "@google/genai";
 
@@ -23,6 +24,36 @@ export const AI_INIT_ERROR = `خطای حیاتی: کلید API جمینای پ�
    - Key: \`VITE_API_KEY\`, Value: \`<your-real-gemini-key>\`
 
 این فایل به گیت‌هاب ارسال **نمی‌شود** و کلید شما امن باقی می‌ماند. پس از ساخت این فایل یا تنظیم متغیر در Netlify، برنامه را مجدداً اجرا یا Deploy کنید.`;
+
+const handleGeminiError = (error: unknown): string => {
+    const err = error as Error;
+    const errorMessage = err.message || 'یک خطای ناشناخته رخ داد.';
+
+    if (errorMessage.includes('429') || /quota/i.test(errorMessage)) {
+        return `متاسفانه، شما به محدودیت استفاده از سرویس هوش مصنوعی رسیده‌اید (Quota Exceeded).
+        
+این یک خطای فنی در برنامه نیست، بلکه به این معنی است که محدودیت‌های پلن رایگان شما در Google AI به پایان رسیده است. لطفاً برای اطلاعات بیشتر صورتحساب و پلن خود را در وب‌سایت Google AI بررسی کنید.`;
+    }
+
+    if (errorMessage.includes('PERMISSION_DENIED') && /http referrer/i.test(errorMessage)) {
+        const urlMatch = errorMessage.match(/httpReferrer: "(.*?)"/);
+        const domain = urlMatch ? new URL(urlMatch[1]).hostname : 'دامنه شما';
+        
+        return `خطای دسترسی (PERMISSION_DENIED): ⛔️
+دامنه \`${domain}\` اجازه استفاده از این کلید API را ندارد.
+
+**راه حل:**
+شما باید این دامنه را به لیست دامنه‌های مجاز برای کلید API خود اضافه کنید:
+1. وارد Google Cloud Console شوید.
+2. به بخش "APIs & Services" > "Credentials" بروید.
+3. کلید API مربوط به این پروژه را پیدا کرده و روی آن کلیک کنید تا وارد صفحه ویرایش شوید.
+4. در بخش "Application restrictions"، گزینه "Websites" را انتخاب کنید.
+5. روی "ADD" کلیک کرده و آدرس وب‌سایت خود را به این شکل وارد کنید: \`${window.location.origin}\`
+6. تغییرات را ذخیره کنید. ممکن است چند دقیقه طول بکشد تا تنظیمات جدید اعمال شوند.`;
+    }
+
+    return errorMessage;
+};
 
 
 const getAiClient = (): GoogleGenAI => {
@@ -76,7 +107,7 @@ export async function* generateStoryScenarioStream(userAbout: string, idea: stri
 
   } catch (error) {
     console.error("Gemini story scenario stream error:", error);
-    yield `خطا در تولید سناریوی استوری: ${(error as Error).message}`;
+    yield handleGeminiError(error);
   }
 }
 
@@ -115,7 +146,7 @@ export async function* generateCaptionStream(userAbout: string, scenarioContent:
 
     } catch (error) {
         console.error("Gemini caption stream error:", error);
-        yield `خطا در تولید کپشن: ${(error as Error).message}`;
+        yield handleGeminiError(error);
     }
 }
 
@@ -143,7 +174,7 @@ export const generateImage = async (prompt: string, aspectRatio: '1:1' | '16:9' 
 
     } catch (error) {
         console.error("Gemini image generation error:", error);
-        throw new Error(`خطا در تولید عکس: ${(error as Error).message}`);
+        throw new Error(handleGeminiError(error));
     }
 };
 
@@ -189,7 +220,7 @@ export const editImage = async (prompt: string, base64ImageData: string, mimeTyp
 
     } catch (error) {
         console.error("Gemini image edit error:", error);
-        throw new Error(`خطا در ویرایش عکس: ${(error as Error).message}`);
+        throw new Error(handleGeminiError(error));
     }
 };
 
@@ -244,6 +275,6 @@ export const getLatestAlgorithmNews = async (): Promise<{text: string, grounding
 
     } catch (error) {
         console.error("Gemini algorithm news error:", error);
-        throw new Error(`خطا در دریافت اخبار الگوریتم: ${(error as Error).message}`);
+        throw new Error(handleGeminiError(error));
     }
 };
