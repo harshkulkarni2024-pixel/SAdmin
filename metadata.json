@@ -1,7 +1,0 @@
-{
-  "name": " Item 1.7",
-  "description": "A web-based AI assistant, ported from a Telegram bot, designed to help users generate content for social media. Features include story and post scenario generation, image creation, AI chat, and an admin panel for user management.",
-  "requestFramePermissions": [
-    "microphone"
-  ]
-}
