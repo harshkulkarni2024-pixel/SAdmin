@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
 import { Icon } from './Icon';
@@ -10,14 +11,13 @@ interface VoiceInputProps {
 
 export const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscriptChange, currentValue, disabled = false }) => {
   const { isListening, transcript, startListening, stopListening, error, isSupported } = useSpeechRecognition();
-  
-  useEffect(() => {
-    if (error) {
-        console.warn(`Voice input error: ${error}`);
-    }
-  }, [error]);
 
   const handleToggleListening = () => {
+    if (error) {
+      alert(error);
+      return;
+    }
+
     if (isListening) {
       stopListening();
     } else {

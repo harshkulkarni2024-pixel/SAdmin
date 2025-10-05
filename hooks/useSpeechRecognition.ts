@@ -66,8 +66,14 @@ export const useSpeechRecognition = (): SpeechRecognitionHook => {
 
   useEffect(() => {
     if (!isSupported) {
-      setError("Speech recognition is not supported in this browser.");
+      setError("تشخیص گفتار در این مرورگر پشتیبانی نمی‌شود.");
       return;
+    }
+
+    // Add explicit check for secure context. Many browsers require HTTPS for this API.
+    if (!window.isSecureContext) {
+        setError("برای استفاده از ورودی صوتی، برنامه باید روی یک اتصال امن (HTTPS) اجرا شود. این یک الزام امنیتی مرورگر برای حفظ حریم خصوصی شماست.");
+        return;
     }
 
     const SpeechRecognition = getSpeechRecognition()!;
@@ -99,7 +105,7 @@ export const useSpeechRecognition = (): SpeechRecognitionHook => {
       } else if (event.error === 'network') {
           errorMessage = 'خطای شبکه. برای استفاده از تشخیص گفتار به اینترنت متصل باشید.';
       } else if (event.error === 'service-not-allowed') {
-          errorMessage = 'سرویس تشخیص گفتار توسط مرورگر یا سیستم شما مجاز نیست.';
+          errorMessage = 'سرویس تشخیص گفتار مجاز نیست. این مشکل معمولاً به دلیل اجرای برنامه روی اتصال غیرامن (HTTP) به جای HTTPS رخ می‌دهد.';
       }
       setError(errorMessage);
       setIsListening(false);
