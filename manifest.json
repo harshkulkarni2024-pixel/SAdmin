@@ -2,7 +2,7 @@
   "name": "سوپرادمین آیتــم",
   "short_name": "آیتم",
   "description": "یک دستیار هوش مصنوعی تحت وب برای تولید محتوای شبکه‌های اجتماعی.",
-  "start_url": ".",
+  "start_url": "./index.html",
   "scope": ".",
   "display": "standalone",
   "background_color": "#0f172a",
