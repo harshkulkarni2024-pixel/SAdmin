@@ -1,5 +1,5 @@
 // A unique name for the cache
-const CACHE_NAME = 'item-ai-cache-v2.1';
+const CACHE_NAME = 'item-ai-cache-v2.2';
 const APP_SHELL_URL = 'index.html'; // The entry point of our app
 
 // On install, cache the app shell and activate immediately.
