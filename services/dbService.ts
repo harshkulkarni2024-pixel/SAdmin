@@ -1,5 +1,5 @@
 
-import type { User, PostScenario, Plan, Report, Caption, PostIdea, BroadcastMessage, ActivityLog, ChatMessage, SubscriptionHistory, AlgorithmNews, CompetitorAnalysisHistory } from '../types';
+import type { User, PostScenario, Plan, Report, Caption, PostIdea, ActivityLog, ChatMessage, SubscriptionHistory, AlgorithmNews, CompetitorAnalysisHistory } from '../types';
 import { supabase, SUPABASE_INIT_ERROR } from './supabaseClient';
 
 // --- Constants ---
@@ -491,6 +491,15 @@ export const saveReportForUser = async (userId: number, content: string): Promis
     }
 };
 
+export const updateReportById = async (reportId: number, content: string): Promise<void> => {
+    if (!supabase) throw new Error(SUPABASE_INIT_ERROR);
+    const { error } = await supabase.from('reports').update({ content }).eq('id', reportId);
+    if (error) {
+        console.error('Supabase error in updateReportById:', error);
+        throw error;
+    }
+};
+
 export const deleteReportById = async (reportId: number): Promise<void> => {
     if (!supabase) throw new Error(SUPABASE_INIT_ERROR);
     const { error } = await supabase.from('reports').delete().eq('id', reportId);
@@ -557,17 +566,7 @@ export const addCaption = async (userId: number, title: string, content: string,
 };
 
 // --- Broadcasts ---
-export const getLatestBroadcast = async (): Promise<BroadcastMessage | null> => {
-    if (!supabase) return null;
-    const { data, error } = await supabase.from('broadcasts').select('*').order('timestamp', { ascending: false }).limit(1).single();
-    if (error && error.code !== 'PGRST116') handleError(error, 'getLatestBroadcast');
-    return data;
-};
-export const addBroadcast = async (message: string): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('broadcasts').insert({ message, timestamp: new Date().toISOString() });
-    if (error) handleError(error, 'addBroadcast');
-};
+// Broadcast feature removed
 
 // --- Activity Log ---
 export const logActivity = async (userId: number, action: string): Promise<void> => {
@@ -685,18 +684,24 @@ export const saveCompetitorAnalysisHistory = async (userId: number, analysis: Om
 // --- Notifications for Badges ---
 export const getNotificationCounts = async (userId: number): Promise<{ scenarios: number, plans: number, reports: number }> => {
     if (!supabase) return { scenarios: 0, plans: 0, reports: 0 };
-    const { data: scenarios, error: sError, count } = await supabase.from('scenarios').select('id', { count: 'exact' }).eq('user_id', userId);
+    
+    // Scenarios
+    const { data: scenariosData, error: sError } = await supabase.from('scenarios').select('id').eq('user_id', userId);
     if (sError) handleError(sError, 'getNotificationCounts:scenarios');
+    const lastScenarioView = localStorage.getItem(`lastView_scenarios_${userId}`);
+    const newScenariosCount = scenariosData?.filter(scenario => !lastScenarioView || scenario.id > Number(lastScenarioView)).length || 0;
 
+    // Plans
     const plansList = await getPlansForUser(userId);
     const lastPlanView = localStorage.getItem(`lastView_plans_${userId}`);
     const newPlansCount = plansList.filter(plan => !lastPlanView || new Date(plan.timestamp).getTime() > Number(lastPlanView)).length;
 
+    // Reports
     const reportsList = await getReportsForUser(userId);
     const lastReportView = localStorage.getItem(`lastView_reports_${userId}`);
     const newReportsCount = reportsList.filter(report => !lastReportView || new Date(report.timestamp).getTime() > Number(lastReportView)).length;
 
-    return { scenarios: count || 0, plans: newPlansCount, reports: newReportsCount };
+    return { scenarios: newScenariosCount, plans: newPlansCount, reports: newReportsCount };
 };
 
 export const getAdminNotificationCounts = async (): Promise<{ ideas: number, logs: number }> => {

@@ -1,9 +1,21 @@
 // A unique name for the cache
-const CACHE_NAME = 'item-ai-cache-v1.8';
+const CACHE_NAME = 'item-ai-cache-v3.0';
 
-// On install, activate the new service worker immediately.
+// A list of all the essential files to be precached for the app to work offline.
+const PRECACHE_ASSETS = [
+    './index.html',
+    './manifest.json',
+    './logo-192.png',
+    './logo-512.png'
+];
+
+// On install, cache the app shell and activate immediately.
 self.addEventListener('install', (event) => {
-  event.waitUntil(self.skipWaiting());
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(PRECACHE_ASSETS))
+      .then(() => self.skipWaiting())
+  );
 });
 
 // On activate, clean up any old caches and take control of uncontrolled clients.
@@ -35,8 +47,8 @@ self.addEventListener('fetch', (event) => {
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request).catch(() => {
-        // If the network fails, serve the root from cache if it exists.
-        return caches.match('/'); 
+        // If the network fails, serve the app shell (index.html) from cache.
+        return caches.match('./index.html');
       })
     );
     return;
@@ -55,6 +67,10 @@ self.addEventListener('fetch', (event) => {
       return fetch(event.request).then((networkResponse) => {
         // If the request is successful, clone the response and cache it.
         if (networkResponse && networkResponse.status === 200) {
+           // Don't cache requests for the geo-IP service as it needs to be fresh.
+          if (event.request.url.includes('ipapi.co')) {
+            return networkResponse;
+          }
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseToCache);

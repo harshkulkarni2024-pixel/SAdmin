@@ -114,10 +114,18 @@ const StoryGenerator: React.FC<StoryGeneratorProps> = () => {
     };
 
     const handleCopy = (text: string, index: number) => {
-        navigator.clipboard.writeText(text);
-        setCopiedSlide(index);
-        showNotification('متن روی استوری با موفقیت کپی شد!', 'success');
-        setTimeout(() => setCopiedSlide(null), 2000);
+        if (!navigator.clipboard) {
+            showNotification('مرورگر شما از کپی خودکار پشتیبانی نمی‌کند.', 'error');
+            return;
+        }
+        navigator.clipboard.writeText(text).then(() => {
+            setCopiedSlide(index);
+            showNotification('متن روی استوری با موفقیت کپی شد!', 'success');
+            setTimeout(() => setCopiedSlide(null), 2000);
+        }).catch(err => {
+            console.error('Could not copy text: ', err);
+            showNotification('خطا در کپی کردن متن.', 'error');
+        });
     }
 
     const parseAndRenderHistory = (content: string) => {
@@ -142,13 +150,13 @@ const StoryGenerator: React.FC<StoryGeneratorProps> = () => {
                 {slide.title && <h3 className="text-md font-bold text-white bg-violet-800/50 p-2 rounded-md inline-block">{slide.title}</h3>}
                 {slide.recordingInstruction && (
                      <div>
-                        <p className="font-semibold text-teal-300">اینطوری ضبطش کن:</p>
+                        <p className="font-semibold text-teal-300">لوکیشن و استایل:</p>
                         <p className="text-slate-300 whitespace-pre-wrap">{slide.recordingInstruction}</p>
                     </div>
                 )}
                 {slide.instruction && (
                      <div>
-                        <p className="font-semibold text-violet-300">اینو بگو:</p>
+                        <p className="font-semibold text-violet-300">دیالوگ:</p>
                         <p className="text-slate-300 whitespace-pre-wrap">{slide.instruction}</p>
                     </div>
                 )}

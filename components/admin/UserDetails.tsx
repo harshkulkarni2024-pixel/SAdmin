@@ -27,6 +27,7 @@ const UserDetails: React.FC<UserDetailsProps> = ({ user, onBack, onUpdate }) => 
     // Reports Tab
     const [reports, setReports] = useState<Report[]>([]);
     const [newReportContent, setNewReportContent] = useState('');
+    const [editingReport, setEditingReport] = useState<Report | null>(null);
 
     // Scenarios & Ideas
     const [scenarios, setScenarios] = useState<PostScenario[]>([]);
@@ -190,6 +191,19 @@ const UserDetails: React.FC<UserDetailsProps> = ({ user, onBack, onUpdate }) => 
             showNotification(`خطا در افزودن گزارش: ${(e as Error).message}`);
         }
     };
+    
+    const handleSaveReportEdit = async () => {
+        if (!editingReport) return;
+        try {
+            await db.updateReportById(editingReport.id, editingReport.content);
+            setEditingReport(null);
+            await refreshData(currentUser);
+            showNotification('گزارش با موفقیت ویرایش شد.');
+        } catch (e) {
+             showNotification(`خطا در ویرایش گزارش: ${(e as Error).message}`);
+        }
+    };
+
     const handleDeleteReport = async (id: number) => {
         if (window.confirm('آیا از حذف این گزارش مطمئن هستید؟')) {
             try {
@@ -270,33 +284,67 @@ const UserDetails: React.FC<UserDetailsProps> = ({ user, onBack, onUpdate }) => 
                     </div>
                 );
             case 'plans':
-            case 'reports':
-                const isPlans = activeTab === 'plans';
-                const items = isPlans ? plans : reports;
-                const newContent = isPlans ? newPlanContent : newReportContent;
-                const setNewContent = isPlans ? setNewPlanContent : setNewReportContent;
-                const handleAdd = isPlans ? handleAddPlan : handleAddReport;
-                const handleDelete = isPlans ? handleDeletePlan : handleDeleteReport;
-                const title = isPlans ? 'برنامه' : 'گزارش';
-
-                return (
+                 return (
                     <div>
                         <div className="bg-slate-900/70 p-4 rounded-lg mb-6">
-                            <h3 className="font-bold mb-2">افزودن {title} جدید</h3>
+                            <h3 className="font-bold mb-2">افزودن برنامه جدید</h3>
                             <div className="relative">
-                                <textarea value={newContent} onChange={(e) => setNewContent(e.target.value)} className="w-full h-32 bg-slate-700 p-2 rounded mb-2" placeholder={`محتوای ${title} جدید را اینجا بنویسید...`}></textarea>
+                                <textarea value={newPlanContent} onChange={(e) => setNewPlanContent(e.target.value)} className="w-full h-32 bg-slate-700 p-2 rounded mb-2" placeholder="محتوای برنامه جدید را اینجا بنویسید..."></textarea>
                             </div>
-                            <button onClick={handleAdd} disabled={!newContent.trim()} className="bg-violet-600 px-4 py-2 rounded disabled:bg-slate-600">افزودن {title}</button>
+                            <button onClick={handleAddPlan} disabled={!newPlanContent.trim()} className="bg-violet-600 px-4 py-2 rounded disabled:bg-slate-600">افزودن برنامه</button>
                         </div>
                         <div className="space-y-4">
-                            {items.length === 0 && <p className="text-slate-400">هنوز {title}ی برای این کاربر ثبت نشده است.</p>}
-                            {items.map(item => (
+                            {plans.length === 0 && <p className="text-slate-400">هنوز برنامه‌ای برای این کاربر ثبت نشده است.</p>}
+                            {plans.map(item => (
                                 <div key={item.id} className="bg-slate-700/50 p-4 rounded-lg">
                                     <div className="flex justify-between items-start">
                                         <p className="text-sm text-slate-300 whitespace-pre-wrap">{item.content}</p>
-                                        <button onClick={() => handleDelete(item.id)} className="text-red-500 hover:text-red-400 p-1 flex-shrink-0"><Icon name="trash" className="w-5 h-5"/></button>
+                                        <button onClick={() => handleDeletePlan(item.id)} className="text-red-500 hover:text-red-400 p-1 flex-shrink-0"><Icon name="trash" className="w-5 h-5"/></button>
                                     </div>
                                     <p className="text-xs text-slate-500 mt-2 text-left">{new Date(item.timestamp).toLocaleString('fa-IR')}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            case 'reports':
+                 return (
+                    <div>
+                        <div className="bg-slate-900/70 p-4 rounded-lg mb-6">
+                            <h3 className="font-bold mb-2">افزودن گزارش جدید</h3>
+                            <div className="relative">
+                                <textarea value={newReportContent} onChange={(e) => setNewReportContent(e.target.value)} className="w-full h-32 bg-slate-700 p-2 rounded mb-2" placeholder="محتوای گزارش جدید را اینجا بنویسید..."></textarea>
+                            </div>
+                            <button onClick={handleAddReport} disabled={!newReportContent.trim()} className="bg-violet-600 px-4 py-2 rounded disabled:bg-slate-600">افزودن گزارش</button>
+                        </div>
+                        <div className="space-y-4">
+                            {reports.length === 0 && <p className="text-slate-400">هنوز گزارشی برای این کاربر ثبت نشده است.</p>}
+                            {reports.map(item => (
+                                <div key={item.id} className="bg-slate-700/50 p-4 rounded-lg">
+                                    {editingReport?.id === item.id ? (
+                                        <div>
+                                            <textarea
+                                                value={editingReport.content}
+                                                onChange={(e) => setEditingReport({ ...editingReport, content: e.target.value })}
+                                                className="w-full h-32 bg-slate-900 p-2 rounded mb-2"
+                                            />
+                                            <div className="flex gap-2 justify-end">
+                                                <button onClick={() => setEditingReport(null)} className="text-sm bg-slate-600 px-3 py-1 rounded hover:bg-slate-500">لغو</button>
+                                                <button onClick={handleSaveReportEdit} className="text-sm bg-violet-600 px-3 py-1 rounded hover:bg-violet-700">ذخیره</button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <div className="flex justify-between items-start">
+                                                <p className="text-sm text-slate-300 whitespace-pre-wrap flex-grow">{item.content}</p>
+                                                <div className="flex flex-shrink-0 ml-2">
+                                                    <button onClick={() => setEditingReport(item)} className="text-violet-400 hover:text-violet-300 p-1"><Icon name="edit" className="w-5 h-5"/></button>
+                                                    <button onClick={() => handleDeleteReport(item.id)} className="text-red-500 hover:text-red-400 p-1"><Icon name="trash" className="w-5 h-5"/></button>
+                                                </div>
+                                            </div>
+                                            <p className="text-xs text-slate-500 mt-2 text-left">{new Date(item.timestamp).toLocaleString('fa-IR')}</p>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>

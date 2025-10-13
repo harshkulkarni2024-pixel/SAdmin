@@ -91,10 +91,11 @@ export async function generateStoryScenario(userAbout: string, goal: string, ide
     **دستورالعمل‌های خروجی (بسیار مهم):**
     1.  پاسخ تو باید یک آبجکت JSON معتبر باشد و هیچ متنی خارج از آن نباشد.
     2.  این آبجکت باید یک کلید به نام "slides" داشته باشد که مقدار آن یک آرایه از آبجکت‌های استوری است.
-    3.  هر آبجکت استوری در آرایه باید شامل چهار کلید باشد: "title", "recordingInstruction", "instruction", "storyText".
-    4.  در "recordingInstruction"، به زبان ساده و بدون اصطلاحات تخصصی (مثل کلوزآپ)، توضیح بده که کاربر چطور عکس یا ویدیوی آن استوری را ضبط کند. مثلا بنویس: «یک ویدیو از نزدیک از صورت خودت بگیر».
-    5.  از اموجی‌های مرتبط و جذاب (✨, 🚀, 💡) در متن‌ها استفاده کن.
-    6.  در عنوان‌ها از کلمه «استوری» به جای «اسلاید» استفاده کن و از لیست‌های ستاره‌دار (*) در متن‌ها استفاده نکن.
+    3.  هر آبجکت استوری در آرایه باید شامل چهار کلید باشد: "title", "recordingInstruction" (برای لوکیشن و استایل), "instruction" (برای دیالوگ), "storyText" (برای متن روی استوری).
+    4.  در "recordingInstruction" (لوکیشن و استایل)، به زبان ساده، توضیح بده که کاربر چطور و کجا عکس یا ویدیوی آن استوری را ضبط کند. مثلا بنویس: «در فضای باز، یک عکس تمام قد از خودت با محصول در دست بگیر».
+    5.  در "instruction" (دیالوگ)، دیالوگی که کاربر باید رو به دوربین بگوید را کلمه به کلمه بنویس. اگر استوری فقط عکس است و نیازی به دیالوگ ندارد، به صراحت بنویس «این استوری نیاز به دیالوگ ندارد».
+    6.  از اموجی‌های مرتبط و جذاب (✨, 🚀, 💡) در متن‌ها استفاده کن.
+    7.  در عنوان‌ها از کلمه «استوری» به جای «اسلاید» استفاده کن و از لیست‌های ستاره‌دار (*) در متن‌ها استفاده نکن.
     `;
 
     try {
@@ -153,7 +154,7 @@ export async function generateCaption(userAbout: string, contentDescription: str
 }
 
 export async function generateChatResponseStream(user: User, history: ChatMessage[], newUserMessage: { text: string; image?: { data: string; mime: string } }, onChunk: (chunk: string) => void): Promise<void> {
-    const systemInstruction = `You are "هوش مصنوعی آیتــــم", a friendly AI expert in Instagram content strategy. You are talking to ${user.preferred_name ? user.preferred_name + ' جان' : user.full_name}. Here's some info about their work: "${user.about_info || ''}". You must speak in a friendly, conversational, and intimate Persian tone. Do not use asterisks (*) for lists; use relevant emojis (like 💡, ✅, 🚀) instead.`;
+    const systemInstruction = `You are "هوش مصنوعی آیتــــم", an expert in Instagram content strategy. You are assisting ${user.preferred_name || user.full_name}, whose work is: "${user.about_info || ''}". Your tone is professional yet friendly. Go straight to answering the user's questions without any introductory fluff. Provide concise, expert advice. Speak Persian. Use relevant emojis (like 💡, ✅, 🚀) instead of lists with asterisks (*).`;
     
     const userContent: any[] = [{ type: 'text', text: newUserMessage.text }];
     if (newUserMessage.image) {

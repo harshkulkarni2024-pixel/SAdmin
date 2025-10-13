@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { BroadcastMessage, PostScenario } from '../../types';
+import { PostScenario } from '../../types';
 import { Icon } from '../common/Icon';
 import { UserViewType } from './UserView';
 import * as db from '../../services/dbService';
@@ -78,11 +78,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ setActiveView }) => {
     if (!user) return;
     // Removed onUserUpdate() from here to prevent infinite loop
     const allNews: NewsItem[] = [];
-    
-    const broadcast = await db.getLatestBroadcast();
-    if (broadcast) {
-        allNews.push({id: `broadcast_${broadcast.id}`, type: 'اطلاعیه جدید', content: broadcast.message, date: broadcast.timestamp});
-    }
 
     if(user.is_vip) {
         const plans = await db.getPlansForUser(user.user_id);
@@ -104,9 +99,10 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ setActiveView }) => {
         }
         
         const scenarios: PostScenario[] = await db.getScenariosForUser(user.user_id);
-        if (scenarios.length > 0) {
-            const latestScenario = scenarios.sort((a,b) => b.id - a.id)[0];
-            allNews.push({id: `scenarios_${latestScenario.id}`, type: `سناریوی جدید`, content: `شما ${scenarios.length} سناریوی پست جدید دارید.`, date: new Date(latestScenario.id).toISOString() });
+        const lastScenarioViewTime = Number(localStorage.getItem(`lastView_scenarios_${user.user_id}`) || 0);
+        const newScenarios = scenarios.filter(s => s.id > lastScenarioViewTime);
+        if (newScenarios.length > 0) {
+            allNews.push({id: `scenarios_${newScenarios[0].id}`, type: `سناریوی جدید`, content: `شما ${newScenarios.length} سناریوی پست جدید دارید.`, date: new Date(newScenarios[0].id).toISOString() });
         }
     }
     
@@ -146,22 +142,11 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ setActiveView }) => {
   
   if (!user) return null;
 
-  const broadcastItem = newsItems.find(item => item.type === 'اطلاعیه جدید');
   const otherNewsItems = newsItems.filter(item => item.type !== 'اطلاعیه جدید');
 
 
   return (
     <div className="animate-fade-in">
-      {broadcastItem && (
-        <div className="relative bg-violet-900/50 border border-violet-700 text-violet-200 px-4 py-3 rounded-lg mb-8">
-          <h4 className="font-bold mb-1 flex items-center"><Icon name="broadcast" className="w-5 h-5 me-2" /> اطلاعیه</h4>
-          <p className="text-sm whitespace-pre-wrap">{broadcastItem.content}</p>
-          <button onClick={() => handleNewsClick(broadcastItem)} className="absolute top-2 left-2 text-violet-300 hover:text-white p-1" aria-label="بستن اطلاعیه">
-             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
-        </div>
-      )}
-      
       <div className="flex items-baseline gap-x-2 mb-2">
         <h1 className="text-3xl font-bold text-white whitespace-nowrap">
           {user.full_name}

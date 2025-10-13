@@ -2,7 +2,6 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { User } from '../../types';
 import { Icon } from '../common/Icon';
 import UserManagement from './UserManagement';
-import Broadcast from './Broadcast';
 import UserDetails from './UserDetails';
 import ActivityLog from './ActivityLog';
 import VipManagement from './VipManagement';
@@ -14,7 +13,7 @@ interface AdminViewProps {
   // Props are now handled by context
 }
 
-type AdminViewType = 'users' | 'broadcast' | 'activity' | 'vip_management' | 'algorithm_news';
+type AdminViewType = 'users' | 'activity' | 'vip_management' | 'algorithm_news';
 
 const AdminView: React.FC<AdminViewProps> = () => {
   const { user, logout: onLogout } = useUser();
@@ -64,7 +63,7 @@ const AdminView: React.FC<AdminViewProps> = () => {
                 setActiveView('users');
                 history.replaceState({ adminView: 'users' }, '', '#users');
             }
-        } else if (state?.adminView && ['users', 'broadcast', 'activity', 'vip_management', 'algorithm_news'].includes(state.adminView)) {
+        } else if (state?.adminView && ['users', 'activity', 'vip_management', 'algorithm_news'].includes(state.adminView)) {
             setSelectedUser(null);
             setActiveView(state.adminView as AdminViewType);
         } else {
@@ -86,7 +85,7 @@ const AdminView: React.FC<AdminViewProps> = () => {
                 setActiveView('users');
                 history.replaceState({ adminView: 'userDetails', userId }, '', `#users/${userId}`);
             }
-        } else if (['broadcast', 'activity', 'vip_management', 'algorithm_news'].includes(hash)) {
+        } else if (['activity', 'vip_management', 'algorithm_news'].includes(hash)) {
             setActiveView(hash as AdminViewType);
             setSelectedUser(null);
             history.replaceState({ adminView: hash }, '', `#${hash}`);
@@ -163,8 +162,6 @@ const AdminView: React.FC<AdminViewProps> = () => {
         return <UserManagement key={userListVersion} onSelectUser={handleSelectUser} />;
       case 'vip_management':
         return <VipManagement onVipUpdate={handleVipUpdate} />;
-      case 'broadcast':
-        return <Broadcast />;
       case 'algorithm_news':
         return <AlgorithmNewsEditor />;
       case 'activity':
@@ -195,7 +192,6 @@ const AdminView: React.FC<AdminViewProps> = () => {
               <ul className="space-y-2">
                   <NavItem view="users" icon="users" label="کاربران" count={notifications.ideas}/>
                   <NavItem view="vip_management" icon="key" label="مدیریت VIP" count={0} />
-                  <NavItem view="broadcast" icon="broadcast" label="ارسال اطلاعیه" count={0} />
                   <NavItem view="algorithm_news" icon="report" label="اخبار الگوریتم" count={0} />
                   <NavItem view="activity" icon="document-text" label="آخرین فعالیت‌ها" count={notifications.logs} />
               </ul>

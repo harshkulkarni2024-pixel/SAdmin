@@ -210,14 +210,24 @@ const CompetitorAnalysis: React.FC<CompetitorAnalysisProps> = () => {
                         <h2 className="text-2xl font-bold text-white mb-4">تاریخچه تحلیل‌ها</h2>
                         <div className="space-y-2">
                             {history.map(item => (
-                                <button
-                                    key={item.id}
-                                    onClick={() => setAnalysisResult(item)}
-                                    className="w-full text-right bg-slate-800 p-3 rounded-lg flex justify-between items-center hover:bg-slate-700/50 transition-colors"
-                                >
-                                    <span className="font-semibold text-white">تحلیل پیج: {item.instagram_id}</span>
-                                    <span className="text-xs text-slate-400">{new Date(item.created_at).toLocaleDateString('fa-IR')}</span>
-                                </button>
+                                <div key={item.id} className="bg-slate-800 p-3 rounded-lg flex justify-between items-center hover:bg-slate-700/50 transition-colors">
+                                    <button
+                                        onClick={() => setAnalysisResult(item)}
+                                        className="text-right flex-grow"
+                                    >
+                                      <span className="font-semibold text-white">تحلیل پیج: </span>
+                                      <a
+                                          href={`https://instagram.com/${item.instagram_id}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="text-violet-400 hover:underline font-semibold"
+                                      >
+                                          {item.instagram_id}
+                                      </a>
+                                    </button>
+                                    <span className="text-xs text-slate-400 flex-shrink-0">{new Date(item.created_at).toLocaleDateString('fa-IR')}</span>
+                                </div>
                             ))}
                         </div>
                     </div>

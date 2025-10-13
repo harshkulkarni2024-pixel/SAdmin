@@ -172,12 +172,6 @@ export interface ChatMessage {
     isInterim?: boolean; // For transient UI states, like streaming AI response
 }
 
-export interface BroadcastMessage {
-  id: number;
-  message: string;
-  timestamp: string;
-}
-
 export interface ActivityLog {
   id: number;
   user_id: number;
