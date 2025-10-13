@@ -5,10 +5,9 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  // Change 'base' to an empty string to use relative paths.
-  // This makes asset paths work correctly regardless of deployment subfolder,
-  // fixing issues with PWA "Add to Home Screen" on services like GitHub Pages.
-  base: '',
+  // Change 'base' to a forward slash for absolute paths from the domain root.
+  // This is the most robust setting for apps deployed at the root level.
+  base: '/',
   // Securely expose only necessary environment variables to the client-side code.
   define: {
     'process.env.LIARA_API_KEY': JSON.stringify(process.env.LIARA_API_KEY),

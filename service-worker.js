@@ -1,12 +1,20 @@
 // A unique name for the cache
-const CACHE_NAME = 'item-ai-cache-v2.3';
-const APP_SHELL_URL = 'index.html'; // The entry point of our app
+const CACHE_NAME = 'item-ai-cache-v4.0';
+
+// A list of all the essential files to be precached for the app to work offline.
+// Using absolute paths for robustness on a root-level domain.
+const PRECACHE_ASSETS = [
+    '/index.html',
+    '/manifest.json',
+    '/logo-192.png',
+    '/logo-512.png'
+];
 
 // On install, cache the app shell and activate immediately.
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.add(APP_SHELL_URL))
+      .then((cache) => cache.addAll(PRECACHE_ASSETS))
       .then(() => self.skipWaiting())
   );
 });
@@ -41,7 +49,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(event.request).catch(() => {
         // If the network fails, serve the app shell (index.html) from cache.
-        return caches.match(APP_SHELL_URL);
+        return caches.match('/index.html');
       })
     );
     return;

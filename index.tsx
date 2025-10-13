@@ -6,7 +6,7 @@ import App from './App';
 // Register the service worker for PWA functionality
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./service-worker.js', { scope: './' })
+    navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
       .then(registration => {
         console.log('ServiceWorker registration successful with scope: ', registration.scope);
       }, err => {
