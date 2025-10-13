@@ -1,0 +1,84 @@
+// A unique name for the cache
+const CACHE_NAME = 'item-ai-cache-v4.0';
+
+// A list of all the essential files to be precached for the app to work offline.
+// Using absolute paths for robustness on a root-level domain.
+const PRECACHE_ASSETS = [
+    '/index.html',
+    '/manifest.json',
+    '/logo-192.png',
+    '/logo-512.png'
+];
+
+// On install, cache the app shell and activate immediately.
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(PRECACHE_ASSETS))
+      .then(() => self.skipWaiting())
+  );
+});
+
+// On activate, clean up any old caches and take control of uncontrolled clients.
+self.addEventListener('activate', (event) => {
+  const cacheWhitelist = [CACHE_NAME];
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheWhitelist.indexOf(cacheName) === -1) {
+            // Delete old caches
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    }).then(() => self.clients.claim()) // Take control of the page
+  );
+});
+
+// On fetch, serve from cache if available, otherwise fetch from network and update cache.
+self.addEventListener('fetch', (event) => {
+  // We only want to cache GET requests.
+  if (event.request.method !== 'GET') {
+    return;
+  }
+  
+  // For navigation requests (the HTML page itself), use a network-first strategy.
+  // This ensures users always get the latest version of the app shell if they are online.
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(() => {
+        // If the network fails, serve the app shell (index.html) from cache.
+        return caches.match('/index.html');
+      })
+    );
+    return;
+  }
+
+  // For all other requests (JS, CSS, images, fonts), use a cache-first strategy.
+  // This makes the app load instantly on subsequent visits.
+  event.respondWith(
+    caches.match(event.request).then((cachedResponse) => {
+      // If a cached response is found, return it.
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+
+      // Otherwise, fetch from the network.
+      return fetch(event.request).then((networkResponse) => {
+        // If the request is successful, clone the response and cache it.
+        if (networkResponse && networkResponse.status === 200) {
+           // Don't cache requests for the geo-IP service as it needs to be fresh.
+          if (event.request.url.includes('ipapi.co')) {
+            return networkResponse;
+          }
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+        }
+        return networkResponse;
+      });
+    })
+  );
+});
