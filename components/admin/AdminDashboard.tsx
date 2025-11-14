@@ -113,7 +113,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
     }, []);
 
     const maxScenarioCount = useMemo(() => Math.max(1, ...scenarioStats.map(s => s.count)), [scenarioStats]);
-    const maxVideoStat = useMemo(() => Math.max(10, ...videoStats.flatMap(u => Object.values(u.stats))), [videoStats]);
 
 
     if (isLoading) {
@@ -175,13 +174,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
                      ))}
                  </div>
                  <div className="space-y-4">
-                     {videoStats.map(userStat => (
+                     {videoStats.map(userStat => {
+                        const stats = userStat.stats;
+                        const total = stats.delivered + stats.uploaded + stats.pending + stats.editing;
+                        const maxStat = Math.max(1, total);
+                        
+                        return (
                          <div key={userStat.userId}>
                              <p className="text-sm font-semibold text-slate-200 mb-1">{userStat.userName}</p>
                              <div className="w-full bg-slate-900/50 rounded-full h-6 flex overflow-hidden">
                                  {STAT_ITEMS.map(item => {
                                     const value = userStat.stats[item.key as keyof ReportStats];
-                                    const percentage = (value / maxVideoStat) * 100;
+                                    if (value === 0) return null;
+                                    const percentage = (value / maxStat) * 100;
                                     return (
                                         <div 
                                             key={item.key}
@@ -189,13 +194,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
                                             style={{ width: `${percentage}%` }}
                                             title={`${item.label}: ${value}`}
                                         >
-                                           {percentage > 5 && value}
+                                           {value}
                                         </div>
                                     )
                                  })}
                              </div>
                          </div>
-                     ))}
+                     )})}
                  </div>
             </div>
         </div>

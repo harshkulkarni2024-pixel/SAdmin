@@ -1,111 +1,26 @@
 
 
+
+
 import type { User, PostScenario, Plan, Report, Caption, PostIdea, ActivityLog, ChatMessage, SubscriptionHistory, AlgorithmNews, CompetitorAnalysisHistory } from '../types';
 import { supabase, SUPABASE_INIT_ERROR } from './supabaseClient';
 
 // --- Constants ---
 const ADMIN_IDS = [1337]; 
-// M1: Mock admin code for offline/demo use (bypasses database).
-const ADMIN_ACCESS_CODE = 'Item8-demo';
-// M2: Default admin code intended for use with a real database entry.
 const ADMIN_DB_ACCESS_CODE = 'Item8'; 
-
-// T1: Mock user code for offline/demo use (bypasses database).
-const TEST_USER_ACCESS_CODE = 'T1';
-const TEST_USER_ID = 1;
-// T2: Default test user code intended for use with a real database entry.
-const TEST_DB_USER_ACCESS_CODE = 'T2';
-
-
-// --- Mock Users for Demo ---
-// These users allow the app to be used immediately without a database connection.
-const adminExpires = new Date();
-adminExpires.setFullYear(adminExpires.getFullYear() + 10);
-const MOCK_ADMIN_USER: User = {
-  user_id: ADMIN_IDS[0],
-  full_name: 'مدیر سیستم (نمایشی)',
-  access_code: ADMIN_ACCESS_CODE,
-  is_verified: true,
-  about_info: 'مدیر کل سیستم با دسترسی کامل به تمام بخش‌ها.',
-  preferred_name: 'مدیر',
-  story_requests: 0,
-  caption_idea_requests: 0,
-  chat_messages: 0,
-  story_limit: 999,
-  caption_idea_limit: 999,
-  chat_limit: 9999,
-  last_request_date: new Date().toISOString().split('T')[0],
-  last_weekly_reset_date: new Date().toISOString().split('T')[0],
-  is_vip: true,
-  subscription_expires_at: adminExpires.toISOString(),
-};
-
-const testUserExpires = new Date();
-testUserExpires.setDate(testUserExpires.getDate() + 30);
-const MOCK_TEST_USER: User = {
-  user_id: TEST_USER_ID,
-  full_name: 'کاربر تستی (نمایشی)',
-  access_code: TEST_USER_ACCESS_CODE,
-  is_verified: true,
-  about_info: 'یک تولیدکننده محتوای خلاق در حوزه سبک زندگی و روزمرگی.',
-  preferred_name: 'کاربر تستی',
-  story_requests: 0,
-  caption_idea_requests: 0,
-  chat_messages: 0,
-  story_limit: 2,
-  caption_idea_limit: 5,
-  chat_limit: 150,
-  last_request_date: new Date().toISOString().split('T')[0],
-  last_weekly_reset_date: new Date().toISOString().split('T')[0],
-  is_vip: true,
-  subscription_expires_at: testUserExpires.toISOString(),
-};
-
 
 // --- Helper Functions ---
 const handleError = (error: any, context: string) => {
-    // This function now primarily serves for logging errors during development.
-    // The null check for supabase is now handled in each function to throw a user-facing error.
     if (error) {
         console.error(`Supabase error in ${context}:`, error);
     }
     return null;
 }
 
-const getMockUserFromStorage = (userId: number): User | null => {
-    try {
-        const stored = localStorage.getItem(`mock_user_${userId}`);
-        return stored ? JSON.parse(stored) : null;
-    } catch {
-        return null;
-    }
-};
-
-const saveMockUserToStorage = (user: User): void => {
-    try {
-        localStorage.setItem(`mock_user_${user.user_id}`, JSON.stringify(user));
-    } catch (e) {
-        console.error("Failed to save mock user to storage", e);
-    }
-};
-
-
 // --- User Management ---
 export const isUserAdmin = (userId: number): boolean => ADMIN_IDS.includes(userId);
 
 export const verifyAccessCode = async (code: string, isSessionLogin: boolean = false): Promise<User | null> => {
-    // --- MOCK USER LOGIC ---
-    if (!isSessionLogin) {
-        if (code === ADMIN_ACCESS_CODE) return Promise.resolve(getMockUserFromStorage(MOCK_ADMIN_USER.user_id) || MOCK_ADMIN_USER);
-        if (code === TEST_USER_ACCESS_CODE) return Promise.resolve(getMockUserFromStorage(MOCK_TEST_USER.user_id) || MOCK_TEST_USER);
-    }
-    if (isSessionLogin) {
-        const userId = parseInt(code, 10);
-        if (userId === ADMIN_IDS[0]) return Promise.resolve(getMockUserFromStorage(MOCK_ADMIN_USER.user_id) || MOCK_ADMIN_USER);
-        if (userId === TEST_USER_ID) return Promise.resolve(getMockUserFromStorage(MOCK_TEST_USER.user_id) || MOCK_TEST_USER);
-    }
-    // --- END MOCK USER LOGIC ---
-
     if (!supabase) {
         throw new Error(SUPABASE_INIT_ERROR);
     }
@@ -128,7 +43,6 @@ export const verifyAccessCode = async (code: string, isSessionLogin: boolean = f
     }
 
     if (!user) {
-        // Check for admin code in DB
         if (!isSessionLogin && code === ADMIN_DB_ACCESS_CODE) {
              const { data: adminUser, error: adminError } = await supabase.from('users').select('*').eq('user_id', ADMIN_IDS[0]).single();
              if (adminError) {
@@ -140,23 +54,19 @@ export const verifyAccessCode = async (code: string, isSessionLogin: boolean = f
         return null;
     }
     
-    // Subscription check before any other logic
     if (user && !isUserAdmin(user.user_id)) {
         const expires = user.subscription_expires_at ? new Date(user.subscription_expires_at) : null;
         if (!expires || expires < new Date()) {
             user.is_subscription_expired = true;
-            // Return early for expired users; no need to reset their daily limits.
             return user;
         }
     }
-
 
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
     let updatePayload: {[key: string]: any} = {};
     let needsUpdate = false;
 
-    // Daily reset for stories
     if (user.last_request_date !== todayStr) {
         updatePayload.story_requests = 0;
         updatePayload.caption_idea_requests = 0;
@@ -164,7 +74,6 @@ export const verifyAccessCode = async (code: string, isSessionLogin: boolean = f
         needsUpdate = true;
     }
 
-    // Weekly reset for chat and images
     const lastWeeklyReset = user.last_weekly_reset_date ? new Date(user.last_weekly_reset_date) : new Date(0);
     const oneWeek = 7 * 24 * 60 * 60 * 1000;
     if (today.getTime() - lastWeeklyReset.getTime() > oneWeek) {
@@ -179,7 +88,6 @@ export const verifyAccessCode = async (code: string, isSessionLogin: boolean = f
         if (updateError) {
             handleError(updateError, 'verifyAccessCode:updateUsage');
         } else {
-            // Manually update user object to reflect changes without re-fetching
             if (updatePayload.story_requests === 0) user.story_requests = 0;
             if (updatePayload.caption_idea_requests === 0) user.caption_idea_requests = 0;
             if (updatePayload.last_request_date) user.last_request_date = updatePayload.last_request_date;
@@ -203,10 +111,6 @@ export const getAllUsers = async (): Promise<User[]> => {
 };
 
 export const getUserById = async (userId: number): Promise<User | null> => {
-    // --- MOCK USER LOGIC ---
-    if (userId === ADMIN_IDS[0]) return Promise.resolve(getMockUserFromStorage(userId) || MOCK_ADMIN_USER);
-    if (userId === TEST_USER_ID) return Promise.resolve(getMockUserFromStorage(userId) || MOCK_TEST_USER);
-    // --- END MOCK USER LOGIC ---
     if (!supabase) throw new Error(SUPABASE_INIT_ERROR);
     const { data, error } = await supabase.from('users').select('*').eq('user_id', userId).single();
     if (error) handleError(error, 'getUserById');
@@ -246,7 +150,6 @@ export const addUser = async (fullName: string, accessCode: string, isVip: boole
         subscription_expires_at: expires.toISOString(),
     };
     
-    // Generate a unique user_id that isn't an admin id
     newUser.user_id = Date.now();
     
     const { error } = await supabase.from('users').insert(newUser);
@@ -261,25 +164,12 @@ export const deleteUser = async (userId: number): Promise<void> => {
     if (!supabase) throw new Error(SUPABASE_INIT_ERROR);
     const { error } = await supabase.from('users').delete().eq('user_id', userId);
     if (error) handleError(error, 'deleteUser');
-    // Note: Cascading deletes should be set up in Supabase to handle related data.
 };
 
 export const updateUserInfo = async (userId: number, info: { about_info: string, preferred_name: string }): Promise<void> => {
-    // --- MOCK USER LOGIC ---
-    const mockUserDefault = userId === TEST_USER_ID ? MOCK_TEST_USER : userId === ADMIN_IDS[0] ? MOCK_ADMIN_USER : null;
-    if (mockUserDefault) {
-        const mockUser = getMockUserFromStorage(userId) || mockUserDefault;
-        mockUser.about_info = info.about_info;
-        mockUser.preferred_name = info.preferred_name;
-        saveMockUserToStorage(mockUser);
-        return;
-    }
-    // --- END MOCK USER LOGIC ---
-
     if (!supabase) throw new Error(SUPABASE_INIT_ERROR);
     const { error } = await supabase.from('users').update({ about_info: info.about_info, preferred_name: info.preferred_name }).eq('user_id', userId);
     if (error) {
-        // Catch specific schema error and provide a helpful message.
         if (error.message.includes("preferred_name") && error.message.includes("column") && error.message.includes("users")) {
              throw new Error(`خطای پایگاه داده: ستون 'preferred_name' در جدول 'users' پیدا نشد.\n\nلطفاً اسکریپت SQL راهنمای موجود در انتهای همین فایل ('services/dbService.ts') را اجرا کنید تا ستون‌های مورد نیاز به جدول کاربران اضافه شوند.`);
         }
@@ -289,16 +179,6 @@ export const updateUserInfo = async (userId: number, info: { about_info: string,
 };
 
 export const updateUserVipStatus = async (userId: number, isVip: boolean): Promise<void> => {
-    // --- MOCK USER LOGIC ---
-    const mockUserDefault = userId === TEST_USER_ID ? MOCK_TEST_USER : userId === ADMIN_IDS[0] ? MOCK_ADMIN_USER : null;
-    if (mockUserDefault) {
-        const mockUser = getMockUserFromStorage(userId) || mockUserDefault;
-        mockUser.is_vip = isVip;
-        saveMockUserToStorage(mockUser);
-        return;
-    }
-    // --- END MOCK USER LOGIC ---
-    
     if (!supabase) throw new Error(SUPABASE_INIT_ERROR);
     const { error } = await supabase.from('users').update({ is_vip: isVip }).eq('user_id', userId);
     if (error) {
@@ -308,16 +188,6 @@ export const updateUserVipStatus = async (userId: number, isVip: boolean): Promi
 }
 
 export const updateUserUsageLimits = async (userId: number, limits: Partial<Pick<User, 'story_requests' | 'caption_idea_requests' | 'chat_messages'>>): Promise<void> => {
-    // --- MOCK USER LOGIC ---
-    const mockUserDefault = userId === TEST_USER_ID ? MOCK_TEST_USER : userId === ADMIN_IDS[0] ? MOCK_ADMIN_USER : null;
-    if (mockUserDefault) {
-        const mockUser = getMockUserFromStorage(userId) || { ...mockUserDefault };
-        Object.assign(mockUser, limits);
-        saveMockUserToStorage(mockUser);
-        return;
-    }
-    // --- END MOCK USER LOGIC ---
-
     if (!supabase) throw new Error(SUPABASE_INIT_ERROR);
     const { error } = await supabase.from('users').update(limits).eq('user_id', userId);
     if (error) {
@@ -327,16 +197,6 @@ export const updateUserUsageLimits = async (userId: number, limits: Partial<Pick
 }
 
 export const updateUserTotalLimits = async (userId: number, limits: Partial<Pick<User, 'story_limit' | 'caption_idea_limit' | 'chat_limit'>>): Promise<void> => {
-    // --- MOCK USER LOGIC ---
-    const mockUserDefault = userId === TEST_USER_ID ? MOCK_TEST_USER : userId === ADMIN_IDS[0] ? MOCK_ADMIN_USER : null;
-    if (mockUserDefault) {
-        const mockUser = getMockUserFromStorage(userId) || { ...mockUserDefault };
-        Object.assign(mockUser, limits);
-        saveMockUserToStorage(mockUser);
-        return;
-    }
-    // --- END MOCK USER LOGIC ---
-
     if (!supabase) throw new Error(SUPABASE_INIT_ERROR);
     const { error } = await supabase.from('users').update(limits).eq('user_id', userId);
     if (error) {
@@ -348,19 +208,6 @@ export const updateUserTotalLimits = async (userId: number, limits: Partial<Pick
 
 // --- Usage Tracking ---
 export const incrementUsage = async (userId: number, type: 'story' | 'chat' | 'caption_idea' | 'competitor_analysis'): Promise<void> => {
-    // --- MOCK USER LOGIC ---
-    const mockUserDefault = userId === TEST_USER_ID ? MOCK_TEST_USER : userId === ADMIN_IDS[0] ? MOCK_ADMIN_USER : null;
-    if (mockUserDefault) {
-        const mockUser = getMockUserFromStorage(userId) || { ...mockUserDefault };
-        if (type === 'story') mockUser.story_requests++;
-        else if (type === 'chat') mockUser.chat_messages++;
-        else if (type === 'caption_idea') mockUser.caption_idea_requests = (mockUser.caption_idea_requests ?? 0) + 1;
-        // 'competitor_analysis' for mock user is not tracked against a specific limit column
-        saveMockUserToStorage(mockUser);
-        return;
-    }
-    // --- END MOCK USER LOGIC ---
-    
     if (!supabase) return;
     const user = await getUserById(userId);
     if (!user) return;
@@ -414,17 +261,6 @@ export const getSubscriptionHistory = async (userId: number): Promise<Subscripti
 
 export const extendSubscription = async (userId: number, days: number): Promise<{ success: boolean; message: string }> => {
     if (days <= 0) return { success: false, message: 'تعداد روزها باید مثبت باشد.' };
-
-    const mockUserDefault = userId === TEST_USER_ID ? MOCK_TEST_USER : userId === ADMIN_IDS[0] ? MOCK_ADMIN_USER : null;
-    if (mockUserDefault) {
-        const mockUser = getMockUserFromStorage(userId) || { ...mockUserDefault };
-        const currentExpiry = mockUser.subscription_expires_at ? new Date(mockUser.subscription_expires_at) : new Date();
-        const baseDate = currentExpiry < new Date() ? new Date() : currentExpiry;
-        baseDate.setDate(baseDate.getDate() + days);
-        mockUser.subscription_expires_at = baseDate.toISOString();
-        saveMockUserToStorage(mockUser);
-        return { success: true, message: `اشتراک کاربر نمایشی برای ${days} روز تمدید شد.` };
-    }
 
     if (!supabase) return { success: false, message: SUPABASE_INIT_ERROR };
 
@@ -581,9 +417,6 @@ export const addCaption = async (userId: number, title: string, content: string,
     if (error) handleError(error, 'addCaption');
 };
 
-// --- Broadcasts ---
-// Broadcast feature removed
-
 // --- Activity Log ---
 export const logActivity = async (userId: number, action: string): Promise<void> => {
     if (!supabase) return;
@@ -616,9 +449,7 @@ export const getChatHistory = async (userId: number): Promise<ChatMessage[]> => 
 };
 export const saveChatHistory = async (userId: number, messages: ChatMessage[]): Promise<void> => {
     if (!supabase) return;
-    // Keep last 50 messages
     const trimmedMessages = messages.length > 50 ? messages.slice(messages.length - 50) : messages;
-    // Don't save transient UI properties to the database.
     const cleanMessages = trimmedMessages.map(({imageUrl, isInterim, ...rest}) => rest);
     const { error } = await supabase.from('chat_history').upsert({ user_id: userId, messages: cleanMessages }, { onConflict: 'user_id' });
     if (error) handleError(error, 'saveChatHistory');
@@ -641,7 +472,7 @@ export const saveStoryHistory = async (userId: number, storyContent: string): Pr
     const currentHistory = await getStoryHistory(userId);
     const newStory = { id: Date.now(), content: storyContent };
     currentHistory.unshift(newStory);
-    if (currentHistory.length > 20) currentHistory.pop(); // Keep last 20 stories
+    if (currentHistory.length > 20) currentHistory.pop();
     const { error } = await supabase.from('story_history').upsert({ user_id: userId, stories: currentHistory }, { onConflict: 'user_id' });
     if (error) handleError(error, 'saveStoryHistory');
 };
@@ -650,7 +481,7 @@ export const saveStoryHistory = async (userId: number, storyContent: string): Pr
 export const getLatestAlgorithmNews = async (): Promise<AlgorithmNews | null> => {
     if (!supabase) throw new Error(SUPABASE_INIT_ERROR);
     const { data, error } = await supabase.from('algorithm_news').select('*').order('created_at', { ascending: false }).limit(1).single();
-    if (error && error.code !== 'PGRST116') { // Ignore "no rows found" error
+    if (error && error.code !== 'PGRST116') {
         handleError(error, 'getLatestAlgorithmNews');
         throw new Error(`خطای پایگاه داده: ${error.message}`);
     }
@@ -669,7 +500,6 @@ export const getAlgorithmNewsHistory = async (limit: number = 20): Promise<Algor
 
 export const addAlgorithmNews = async (content: string): Promise<void> => {
     if (!supabase) throw new Error(SUPABASE_INIT_ERROR);
-    // Use a single object for single-row inserts, which is a common pattern and may resolve subtle API issues.
     const { error } = await supabase.from('algorithm_news').insert({ content });
     if (error) {
         handleError(error, 'addAlgorithmNews');
@@ -702,18 +532,15 @@ export const saveCompetitorAnalysisHistory = async (userId: number, analysis: Om
 export const getNotificationCounts = async (userId: number): Promise<{ scenarios: number, plans: number, reports: number }> => {
     if (!supabase) return { scenarios: 0, plans: 0, reports: 0 };
     
-    // Scenarios
     const { data: scenariosData, error: sError } = await supabase.from('scenarios').select('id').eq('user_id', userId);
     if (sError) handleError(sError, 'getNotificationCounts:scenarios');
     const lastScenarioView = localStorage.getItem(`lastView_scenarios_${userId}`);
     const newScenariosCount = scenariosData?.filter(scenario => !lastScenarioView || scenario.id > Number(lastScenarioView)).length || 0;
 
-    // Plans
     const plansList = await getPlansForUser(userId);
     const lastPlanView = localStorage.getItem(`lastView_plans_${userId}`);
     const newPlansCount = plansList.filter(plan => !lastPlanView || new Date(plan.timestamp).getTime() > Number(lastPlanView)).length;
 
-    // Reports
     const reportsList = await getReportsForUser(userId);
     const lastReportView = localStorage.getItem(`lastView_reports_${userId}`);
     const newReportsCount = reportsList.filter(report => !lastReportView || new Date(report.timestamp).getTime() > Number(lastReportView)).length;
@@ -735,18 +562,12 @@ export const getAdminNotificationCounts = async (): Promise<{ ideas: number, log
     return { ideas: ideasCount || 0, logs: logsCount || 0 };
 };
 
-const dismissNewsItem = async (userId: number, type: 'plan' | 'report' | 'scenarios') => {
-    // This functionality now relies on clearUserNotifications setting localStorage timestamps.
-    // The dashboard logic will filter based on that, so this function is simplified.
-};
-
 export const clearUserNotifications = (section: 'scenarios' | 'plans' | 'reports', userId: number): void => {
     localStorage.setItem(`lastView_${section}_${userId}`, String(Date.now()));
 };
 
 export const clearAdminNotifications = (section: 'ideas' | 'logs'): void => {
      if (section === 'ideas') {
-        // Ideas are cleared by being deleted, so we do nothing here.
      } else {
         localStorage.setItem(`lastView_admin_${section}`, String(Date.now()));
      }
@@ -775,11 +596,8 @@ ALTER TABLE public.users ADD COLUMN IF NOT EXISTS caption_idea_requests INTEGER 
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS caption_idea_limit INTEGER DEFAULT 5 NOT NULL;
 CREATE TABLE IF NOT EXISTS public.subscription_history (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, user_id BIGINT REFERENCES public.users(user_id) ON DELETE CASCADE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), extended_for_days INT NOT NULL, new_expiry_date TIMESTAMPTZ NOT NULL);
 ALTER TABLE public.subscription_history ENABLE ROW LEVEL SECURITY;
--- Drop old/incorrect policies before creating the new one
 DROP POLICY IF EXISTS "Allow authenticated users to read their own history" ON public.subscription_history;
 DROP POLICY IF EXISTS "Allow users to read their own history" ON public.subscription_history;
--- This policy is permissive because the app uses a custom auth system, not Supabase Auth.
--- The client is responsible for fetching data for the correct user.
 CREATE POLICY "Allow users to read their own history" ON public.subscription_history FOR SELECT TO authenticated, anon USING (true);
 DROP POLICY IF EXISTS "Allow full access for service_role" ON public.subscription_history;
 CREATE POLICY "Allow full access for service_role" ON public.subscription_history FOR ALL TO service_role USING (true);
@@ -793,7 +611,22 @@ CREATE TABLE IF NOT EXISTS public.algorithm_news (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
--- Add columns if they don't exist, for users with older schema
+
+-- Fix for existing tables: This ensures the 'id' column auto-increments correctly.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'algorithm_news') AND NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'algorithm_news'
+      AND column_name = 'id'
+      AND identity_generation IS NOT NULL
+  ) THEN
+    ALTER TABLE public.algorithm_news ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY;
+  END IF;
+END;
+$$;
+
 ALTER TABLE public.algorithm_news ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
 ALTER TABLE public.algorithm_news ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
 ALTER TABLE public.algorithm_news ENABLE ROW LEVEL SECURITY;
@@ -801,9 +634,9 @@ DROP POLICY IF EXISTS "Allow all users to read the news" ON public.algorithm_new
 CREATE POLICY "Allow all users to read the news" ON public.algorithm_news FOR SELECT TO authenticated, anon USING (true);
 DROP POLICY IF EXISTS "Allow admin (service_role) to do everything" ON public.algorithm_news;
 CREATE POLICY "Allow admin (service_role) to do everything" ON public.algorithm_news FOR ALL TO service_role USING (true);
--- FIX: ADD INSERT POLICY FOR ADMINS (ANON KEY)
 DROP POLICY IF EXISTS "Allow admin to insert news" ON public.algorithm_news;
-CREATE POLICY "Allow admin to insert news" ON public.algorithm_news FOR INSERT TO authenticated, anon WITH CHECK (true);
+-- Security fix: Only allow authenticated users to insert news, not anonymous ones.
+CREATE POLICY "Allow admin to insert news" ON public.algorithm_news FOR INSERT TO authenticated WITH CHECK (true);
 INSERT INTO public.algorithm_news (content) 
 SELECT 'هنوز خبری ثبت نشده است. لطفاً از پنل مدیریت اولین خبر را وارد کنید.'
 WHERE NOT EXISTS (SELECT 1 FROM public.algorithm_news);
@@ -818,10 +651,7 @@ CREATE TABLE IF NOT EXISTS public.competitor_analysis_history (
     web_analysis TEXT
 );
 ALTER TABLE public.competitor_analysis_history ENABLE ROW LEVEL SECURITY;
--- Drop old/incorrect policy
 DROP POLICY IF EXISTS "Users can manage their own analysis history" ON public.competitor_analysis_history;
--- This policy is permissive because the app uses a custom auth system.
--- Client-side code is responsible for querying data for the correct user.
 CREATE POLICY "Users can manage their own analysis history" 
 ON public.competitor_analysis_history
 FOR ALL TO authenticated, anon

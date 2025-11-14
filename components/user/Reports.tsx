@@ -89,7 +89,7 @@ const Reports: React.FC<ReportsProps> = () => {
                                    style={{ width: `${percentage}%` }}
                                    title={`${item.label}: ${value}`}
                                >
-                                  {percentage > 10 && value}
+                                  {value}
                                </div>
                            )
                         })}
