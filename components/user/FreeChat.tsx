@@ -13,6 +13,15 @@ interface FreeChatProps {
     setActiveView: (view: UserViewType) => void;
 }
 
+const formatMessageText = (text: string): string => {
+    if (!text) return '';
+    const urlPattern = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+    return text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(urlPattern, url => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-violet-400 hover:underline break-all">${url}</a>`)
+        .replace(/\n/g, '<br />');
+};
+
 const FreeChat: React.FC<FreeChatProps> = ({ setActiveView }) => {
     const { user, updateUser: onUserUpdate } = useUser();
     const showNotification = useNotification();
@@ -167,7 +176,7 @@ const FreeChat: React.FC<FreeChatProps> = ({ setActiveView }) => {
                         >
                             {msg.imageUrl && <img src={msg.imageUrl} alt="Uploaded content" className="rounded-md mb-2 max-w-xs max-h-64" />}
                             {msg.text ? 
-                             <div className="prose prose-invert prose-p:my-0 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: msg.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+                             <div className="prose prose-invert prose-p:my-0 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: formatMessageText(msg.text) }} />
                              : (isLoading && index === messages.length - 1) && 
                              (<div className="flex items-center gap-2 p-1">
                                 <span className="w-2 h-2 bg-slate-400 rounded-full animate-pulse delay-0"></span>

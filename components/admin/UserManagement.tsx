@@ -60,10 +60,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onSelectUser }) => {
   return (
     <div className="animate-fade-in">
       <div className="flex justify-between items-center mb-6">
-         <button onClick={onLogout} className="flex items-center bg-slate-700 text-slate-300 px-4 py-2 rounded-lg hover:bg-red-600 hover:text-white transition-colors">
-            <Icon name="logout" className="w-5 h-5 me-2" />
-            خروج از حساب کاربری
-        </button>
+         <h1 className="text-3xl font-bold text-white">مدیریت کاربران</h1>
         <button onClick={() => setShowAddModal(true)} className="flex items-center bg-violet-600 text-white px-4 py-2 rounded-lg hover:bg-violet-700 transition-colors">
           <Icon name="plus" className="w-5 h-5 me-2" />
           افزودن کاربر

@@ -11,6 +11,17 @@ interface CaptionsProps {
   // Props are handled by context
 }
 
+const formatCaptionContent = (content: string | null): string => {
+    if (!content) return '';
+    const urlPattern = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+    // Captions come from AI, may have markdown.
+    return content
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(urlPattern, url => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-violet-400 hover:underline break-all">${url}</a>`)
+      .replace(/\n/g, '<br />');
+};
+
+
 const Captions: React.FC<CaptionsProps> = () => {
   const { user, updateUser: onUserUpdate } = useUser();
   const showNotification = useNotification();
@@ -152,7 +163,7 @@ const Captions: React.FC<CaptionsProps> = () => {
         </button>
         <div className="bg-slate-800 p-6 rounded-lg">
           <h2 className="text-2xl font-bold mb-4 text-white">{selectedCaption.title}</h2>
-          <div className="prose prose-invert prose-p:text-slate-300 prose-strong:text-white whitespace-pre-wrap mb-6" dangerouslySetInnerHTML={{ __html: selectedCaption.content }} />
+          <div className="prose prose-invert prose-p:text-slate-300 prose-strong:text-white whitespace-pre-wrap mb-6" dangerouslySetInnerHTML={{ __html: formatCaptionContent(selectedCaption.content) }} />
 
           <button
             onClick={handleRegenerate}
@@ -165,7 +176,7 @@ const Captions: React.FC<CaptionsProps> = () => {
            {newCaption !== null && (
                <div className="mt-6 border-t border-slate-700 pt-6">
                    <h3 className="text-xl font-bold text-violet-400 mb-2">پیشنهاد جدید:</h3>
-                    <div className="prose prose-invert prose-p:text-slate-300 prose-strong:text-white whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: newCaption }} />
+                    <div className="prose prose-invert prose-p:text-slate-300 prose-strong:text-white whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: formatCaptionContent(newCaption) }} />
                </div>
            )}
         </div>
@@ -231,7 +242,7 @@ const Captions: React.FC<CaptionsProps> = () => {
                            <Icon name="paperclip" className="w-5 h-5" />
                         </button>
                     </div>
-                    <div className="prose prose-invert prose-p:text-slate-300 prose-strong:text-white whitespace-pre-wrap bg-slate-900/50 p-4 rounded-md" dangerouslySetInnerHTML={{ __html: generatedCaptionFromIdea }} />
+                    <div className="prose prose-invert prose-p:text-slate-300 prose-strong:text-white whitespace-pre-wrap bg-slate-900/50 p-4 rounded-md" dangerouslySetInnerHTML={{ __html: formatCaptionContent(generatedCaptionFromIdea) }} />
                 </div>
             )}
         </div>
@@ -257,7 +268,7 @@ const Captions: React.FC<CaptionsProps> = () => {
                            {copiedCaptionId === caption.id ? <span className="text-xs">کپی شد!</span> : <Icon name="paperclip" className="w-5 h-5" />}
                         </button>
                     </div>
-                  <p className="text-slate-400 line-clamp-4" dangerouslySetInnerHTML={{__html: caption.content}} />
+                  <div className="text-slate-400 line-clamp-4" dangerouslySetInnerHTML={{__html: formatCaptionContent(caption.content)}} />
                 </div>
                 <button onClick={() => handleSelectCaption(caption)} className="mt-4 w-full bg-slate-700 text-white py-2 px-4 rounded-lg hover:bg-violet-600 transition-colors">
                   مشاهده و دریافت پیشنهاد جدید

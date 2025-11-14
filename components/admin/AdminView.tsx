@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { User } from '../../types';
 import { Icon } from '../common/Icon';
+import AdminDashboard from './AdminDashboard';
 import UserManagement from './UserManagement';
 import UserDetails from './UserDetails';
 import ActivityLog from './ActivityLog';
@@ -13,11 +14,12 @@ interface AdminViewProps {
   // Props are now handled by context
 }
 
-type AdminViewType = 'users' | 'activity' | 'vip_management' | 'algorithm_news';
+// Fix: Export AdminViewType so it can be imported by other components.
+export type AdminViewType = 'dashboard' | 'users' | 'activity' | 'vip_management' | 'algorithm_news';
 
 const AdminView: React.FC<AdminViewProps> = () => {
   const { user, logout: onLogout } = useUser();
-  const [activeView, setActiveView] = useState<AdminViewType>('users');
+  const [activeView, setActiveView] = useState<AdminViewType>('dashboard');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
@@ -60,15 +62,15 @@ const AdminView: React.FC<AdminViewProps> = () => {
                 setActiveView('users');
             } else {
                 setSelectedUser(null);
-                setActiveView('users');
-                history.replaceState({ adminView: 'users' }, '', '#users');
+                setActiveView('dashboard');
+                history.replaceState({ adminView: 'dashboard' }, '', '#dashboard');
             }
-        } else if (state?.adminView && ['users', 'activity', 'vip_management', 'algorithm_news'].includes(state.adminView)) {
+        } else if (state?.adminView && ['dashboard', 'users', 'activity', 'vip_management', 'algorithm_news'].includes(state.adminView)) {
             setSelectedUser(null);
             setActiveView(state.adminView as AdminViewType);
         } else {
             setSelectedUser(null);
-            setActiveView('users');
+            setActiveView('dashboard');
         }
     };
 
@@ -85,14 +87,14 @@ const AdminView: React.FC<AdminViewProps> = () => {
                 setActiveView('users');
                 history.replaceState({ adminView: 'userDetails', userId }, '', `#users/${userId}`);
             }
-        } else if (['activity', 'vip_management', 'algorithm_news'].includes(hash)) {
+        } else if (['users', 'activity', 'vip_management', 'algorithm_news'].includes(hash)) {
             setActiveView(hash as AdminViewType);
             setSelectedUser(null);
             history.replaceState({ adminView: hash }, '', `#${hash}`);
         } else {
-            setActiveView('users');
+            setActiveView('dashboard');
             setSelectedUser(null);
-            history.replaceState({ adminView: 'users' }, '', '#users');
+            history.replaceState({ adminView: 'dashboard' }, '', '#dashboard');
         }
     };
     
@@ -132,7 +134,7 @@ const AdminView: React.FC<AdminViewProps> = () => {
     return <div>Loading admin...</div>
   }
 
-  const NavItem: React.FC<{ view: AdminViewType; icon: React.ComponentProps<typeof Icon>['name']; label: string, count: number }> = ({ view, icon, label, count }) => (
+  const NavItem: React.FC<{ view: AdminViewType; icon: React.ComponentProps<typeof Icon>['name']; label: string, count?: number }> = ({ view, icon, label, count = 0 }) => (
     <li>
       <button
         onClick={() => handleViewChange(view)}
@@ -158,6 +160,8 @@ const AdminView: React.FC<AdminViewProps> = () => {
     }
 
     switch (activeView) {
+      case 'dashboard':
+        return <AdminDashboard onNavigate={handleViewChange} />;
       case 'users':
         return <UserManagement key={userListVersion} onSelectUser={handleSelectUser} />;
       case 'vip_management':
@@ -167,7 +171,7 @@ const AdminView: React.FC<AdminViewProps> = () => {
       case 'activity':
         return <ActivityLog />;
       default:
-        return <UserManagement key={userListVersion} onSelectUser={handleSelectUser} />;
+        return <AdminDashboard onNavigate={handleViewChange} />;
     }
   };
   
@@ -190,9 +194,10 @@ const AdminView: React.FC<AdminViewProps> = () => {
           <div className="flex-grow overflow-y-auto">
             <nav className="p-4 mt-4">
               <ul className="space-y-2">
+                  <NavItem view="dashboard" icon="dashboard" label="داشبورد" />
                   <NavItem view="users" icon="users" label="کاربران" count={notifications.ideas}/>
-                  <NavItem view="vip_management" icon="key" label="مدیریت VIP" count={0} />
-                  <NavItem view="algorithm_news" icon="report" label="اخبار الگوریتم" count={0} />
+                  <NavItem view="vip_management" icon="key" label="مدیریت VIP" />
+                  <NavItem view="algorithm_news" icon="report" label="اخبار الگوریتم" />
                   <NavItem view="activity" icon="document-text" label="آخرین فعالیت‌ها" count={notifications.logs} />
               </ul>
             </nav>

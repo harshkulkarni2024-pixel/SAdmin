@@ -205,3 +205,16 @@ export interface CompetitorAnalysisHistory {
     visual_analysis: string;
     web_analysis: string;
 }
+// Fix: Add the missing BoxApiProfile type for the Instagram profile API service.
+export interface BoxApiProfile {
+  username: string;
+  full_name: string;
+  biography: string;
+  followers_count: number;
+  followings_count: number;
+  posts_count: number;
+  profile_pic_url: string;
+  is_private: boolean;
+  is_verified: boolean;
+  external_url?: string;
+}

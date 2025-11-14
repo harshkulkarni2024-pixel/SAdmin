@@ -39,10 +39,16 @@ const AlgorithmNewsEditor: React.FC = () => {
             setNotification('خبر جدید با موفقیت اضافه و منتشر شد.');
             await fetchHistory(); // Refresh the history list
         } catch (err) {
-            setNotification(`خطا در ذخیره‌سازی: ${(err as Error).message}`);
+            let errorMessage = `خطا در ذخیره‌سازی: ${(err as Error).message}`;
+            if ((err as Error).message.includes('violates row-level security policy')) {
+                errorMessage = `خطای دسترسی پایگاه داده: به نظر می‌رسد پالیسی امنیتی (RLS) برای اضافه کردن خبر جدید تنظیم نشده است.
+
+لطفاً اسکریپت SQL موجود در انتهای فایل 'services/dbService.ts' را در Supabase SQL Editor خود اجرا کنید تا دسترسی لازم ایجاد شود.`;
+            }
+            setNotification(errorMessage);
         } finally {
             setIsSaving(false);
-            setTimeout(() => setNotification(''), 4000);
+            setTimeout(() => setNotification(''), 8000);
         }
     };
     
@@ -52,7 +58,7 @@ const AlgorithmNewsEditor: React.FC = () => {
             <p className="text-slate-400 mb-6">یک خبر جدید اضافه کنید. این خبر برای تمام کاربران نمایش داده خواهد شد.</p>
             
             {notification && (
-                <div className={`p-3 mb-4 rounded-lg text-sm text-center ${notification.includes('خطا') ? 'bg-red-900/50 text-red-300' : 'bg-green-900/50 text-green-300'}`}>
+                <div className={`p-3 mb-4 rounded-lg text-sm whitespace-pre-line ${notification.includes('خطا') ? 'bg-red-900/50 text-red-300' : 'bg-green-900/50 text-green-300'}`}>
                     {notification}
                 </div>
             )}

@@ -12,6 +12,34 @@ interface UserDetailsProps {
 
 type DetailTab = 'about' | 'subscription' | 'plans' | 'reports' | 'scenarios' | 'ideas' | 'limits';
 
+const initialReportState = {
+    delivered: '0',
+    uploaded: '0',
+    pending: '0',
+    editing: '0',
+    details: ''
+};
+
+const parseReportContent = (content: string) => {
+    const delivered = content.match(/تعداد کل ویدیو های تحویل داده شده:\s*(\d+)/)?.[1] || '0';
+    const uploaded = content.match(/تعداد ویدیو بارگذاری شده:\s*(\d+)/)?.[1] || '0';
+    const pending = content.match(/تعداد ویدیو در انتظار بارگزاری:\s*(\d+)/)?.[1] || '0';
+    const editing = content.match(/تعداد ویدیو های در حال تدوین:\s*(\d+)/)?.[1] || '0';
+    const details = content.split('**توضیحات بیشتر:**')[1]?.trim() || '';
+    return { delivered, uploaded, pending, editing, details };
+};
+
+const formatReportContent = (inputs: typeof initialReportState) => {
+    return `- تعداد کل ویدیو های تحویل داده شده: ${inputs.delivered || 0}
+- تعداد ویدیو بارگذاری شده: ${inputs.uploaded || 0}
+- تعداد ویدیو در انتظار بارگزاری: ${inputs.pending || 0}
+- تعداد ویدیو های در حال تدوین: ${inputs.editing || 0}
+
+**توضیحات بیشتر:**
+${inputs.details}`;
+};
+
+
 const UserDetails: React.FC<UserDetailsProps> = ({ user, onBack, onUpdate }) => {
     const [currentUser, setCurrentUser] = useState<User>(user);
     const [activeTab, setActiveTab] = useState<DetailTab>('about');
@@ -26,8 +54,9 @@ const UserDetails: React.FC<UserDetailsProps> = ({ user, onBack, onUpdate }) => 
 
     // Reports Tab
     const [reports, setReports] = useState<Report[]>([]);
-    const [newReportContent, setNewReportContent] = useState('');
+    const [reportInputs, setReportInputs] = useState(initialReportState);
     const [editingReport, setEditingReport] = useState<Report | null>(null);
+    const [editingReportInputs, setEditingReportInputs] = useState(initialReportState);
 
     // Scenarios & Ideas
     const [scenarios, setScenarios] = useState<PostScenario[]>([]);
@@ -179,12 +208,12 @@ const UserDetails: React.FC<UserDetailsProps> = ({ user, onBack, onUpdate }) => 
             }
         }
     };
-
+    
     const handleAddReport = async () => {
-        if (!newReportContent.trim()) return;
+        const content = formatReportContent(reportInputs);
         try {
-            await db.saveReportForUser(user.user_id, newReportContent);
-            setNewReportContent('');
+            await db.saveReportForUser(user.user_id, content);
+            setReportInputs(initialReportState);
             await refreshData(currentUser);
             showNotification('گزارش جدید با موفقیت اضافه شد.');
         } catch (e) {
@@ -192,10 +221,16 @@ const UserDetails: React.FC<UserDetailsProps> = ({ user, onBack, onUpdate }) => 
         }
     };
     
+    const handleStartEditReport = (report: Report) => {
+        setEditingReport(report);
+        setEditingReportInputs(parseReportContent(report.content));
+    };
+
     const handleSaveReportEdit = async () => {
         if (!editingReport) return;
+        const content = formatReportContent(editingReportInputs);
         try {
-            await db.updateReportById(editingReport.id, editingReport.content);
+            await db.updateReportById(editingReport.id, content);
             setEditingReport(null);
             await refreshData(currentUser);
             showNotification('گزارش با موفقیت ویرایش شد.');
@@ -308,37 +343,75 @@ const UserDetails: React.FC<UserDetailsProps> = ({ user, onBack, onUpdate }) => 
                     </div>
                 );
             case 'reports':
+                const ReportForm: React.FC<{ isEditing: boolean }> = ({ isEditing }) => {
+                    const inputs = isEditing ? editingReportInputs : reportInputs;
+                    const setInputs = isEditing ? setEditingReportInputs : setReportInputs;
+                    const handleSubmit = isEditing ? handleSaveReportEdit : handleAddReport;
+                    const handleCancel = () => setEditingReport(null);
+
+                    return (
+                        <div className="bg-slate-900/70 p-4 rounded-lg mb-6">
+                            <h3 className="font-bold mb-4">{isEditing ? 'ویرایش گزارش' : 'افزودن گزارش جدید'}</h3>
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {[
+                                        { key: 'delivered', label: 'ویدیوهای تحویل داده شده' },
+                                        { key: 'uploaded', label: 'ویدیوهای بارگذاری شده' },
+                                        { key: 'pending', label: 'در انتظار بارگذاری' },
+                                        { key: 'editing', label: 'در حال تدوین' },
+                                    ].map(({ key, label }) => (
+                                        <div key={key}>
+                                            <label htmlFor={key} className="block text-sm font-medium text-slate-300 mb-1">{label}</label>
+                                            <input
+                                                type="number"
+                                                id={key}
+                                                value={inputs[key as keyof typeof inputs]}
+                                                onChange={(e) => setInputs(prev => ({ ...prev, [key]: e.target.value }))}
+                                                className="w-full bg-slate-700 p-2 rounded text-white"
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                                <div>
+                                    <label htmlFor="details" className="block text-sm font-medium text-slate-300 mb-1">توضیحات بیشتر</label>
+                                    <textarea
+                                        id="details"
+                                        value={inputs.details}
+                                        onChange={(e) => setInputs(prev => ({ ...prev, details: e.target.value }))}
+                                        className="w-full h-24 bg-slate-700 p-2 rounded"
+                                        placeholder="توضیحات تکمیلی گزارش..."
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 mt-4">
+                                <button onClick={handleSubmit} className="bg-violet-600 px-4 py-2 rounded hover:bg-violet-700">
+                                    {isEditing ? 'ذخیره تغییرات' : 'افزودن گزارش'}
+                                </button>
+                                {isEditing && (
+                                    <button onClick={handleCancel} className="bg-slate-600 px-4 py-2 rounded hover:bg-slate-500">
+                                        لغو
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    );
+                };
+
                  return (
                     <div>
-                        <div className="bg-slate-900/70 p-4 rounded-lg mb-6">
-                            <h3 className="font-bold mb-2">افزودن گزارش جدید</h3>
-                            <div className="relative">
-                                <textarea value={newReportContent} onChange={(e) => setNewReportContent(e.target.value)} className="w-full h-32 bg-slate-700 p-2 rounded mb-2" placeholder="محتوای گزارش جدید را اینجا بنویسید..."></textarea>
-                            </div>
-                            <button onClick={handleAddReport} disabled={!newReportContent.trim()} className="bg-violet-600 px-4 py-2 rounded disabled:bg-slate-600">افزودن گزارش</button>
-                        </div>
+                        {!editingReport && <ReportForm isEditing={false} />}
                         <div className="space-y-4">
                             {reports.length === 0 && <p className="text-slate-400">هنوز گزارشی برای این کاربر ثبت نشده است.</p>}
                             {reports.map(item => (
                                 <div key={item.id} className="bg-slate-700/50 p-4 rounded-lg">
                                     {editingReport?.id === item.id ? (
-                                        <div>
-                                            <textarea
-                                                value={editingReport.content}
-                                                onChange={(e) => setEditingReport({ ...editingReport, content: e.target.value })}
-                                                className="w-full h-32 bg-slate-900 p-2 rounded mb-2"
-                                            />
-                                            <div className="flex gap-2 justify-end">
-                                                <button onClick={() => setEditingReport(null)} className="text-sm bg-slate-600 px-3 py-1 rounded hover:bg-slate-500">لغو</button>
-                                                <button onClick={handleSaveReportEdit} className="text-sm bg-violet-600 px-3 py-1 rounded hover:bg-violet-700">ذخیره</button>
-                                            </div>
-                                        </div>
+                                        <ReportForm isEditing={true} />
                                     ) : (
                                         <div>
                                             <div className="flex justify-between items-start">
                                                 <p className="text-sm text-slate-300 whitespace-pre-wrap flex-grow">{item.content}</p>
                                                 <div className="flex flex-shrink-0 ml-2">
-                                                    <button onClick={() => setEditingReport(item)} className="text-violet-400 hover:text-violet-300 p-1"><Icon name="edit" className="w-5 h-5"/></button>
+                                                    <button onClick={() => handleStartEditReport(item)} className="text-violet-400 hover:text-violet-300 p-1"><Icon name="edit" className="w-5 h-5"/></button>
                                                     <button onClick={() => handleDeleteReport(item.id)} className="text-red-500 hover:text-red-400 p-1"><Icon name="trash" className="w-5 h-5"/></button>
                                                 </div>
                                             </div>

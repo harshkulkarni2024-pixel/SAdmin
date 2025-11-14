@@ -49,6 +49,13 @@ const speak = (text: string, onStart: () => void, onEnd: () => void, onError: (e
     }
 };
 
+const formatMessageText = (text: string): string => {
+    if (!text) return '';
+    const urlPattern = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+    return text
+        .replace(urlPattern, url => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-violet-400 hover:underline break-all">${url}</a>`)
+        .replace(/\n/g, '<br />');
+};
 
 const LiveChat: React.FC = () => {
     const { user, updateUser: onUserUpdate } = useUser();
@@ -234,7 +241,7 @@ const LiveChat: React.FC = () => {
                         <div key={index} className={`flex items-start gap-3 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                             {msg.sender === 'ai' && <div className="w-8 h-8 rounded-full bg-violet-600 flex items-center justify-center flex-shrink-0"><Icon name="dashboard" className="w-5 h-5 text-white" /></div>}
                             <div className={`max-w-xl p-3 rounded-lg ${msg.sender === 'user' ? 'bg-violet-600 text-white' : 'bg-slate-700 text-slate-200'}`}>
-                                <p className="whitespace-pre-wrap">{msg.text}</p>
+                                <div className="whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: formatMessageText(msg.text) }} />
                             </div>
                              {msg.sender === 'user' && <div className="w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center flex-shrink-0"><Icon name="user" className="w-5 h-5 text-slate-300" /></div>}
                         </div>

@@ -9,6 +9,16 @@ interface UpcomingPlansProps {
   // Props are handled by context
 }
 
+const formatTextForDisplay = (text: string): string => {
+    if (!text) return '';
+    const urlPattern = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+    // The AI might use markdown for bolding. Let's handle that too for consistency.
+    return text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(urlPattern, url => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-violet-400 hover:underline break-all">${url}</a>`)
+        .replace(/\n/g, '<br />');
+};
+
 const UpcomingPlans: React.FC<UpcomingPlansProps> = () => {
   const { user } = useUser();
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -46,7 +56,7 @@ const UpcomingPlans: React.FC<UpcomingPlansProps> = () => {
                   day: 'numeric'
                 })}
               </div>
-              <p className="text-slate-300 whitespace-pre-wrap">{plan.content}</p>
+              <div className="text-slate-300 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: formatTextForDisplay(plan.content) }} />
             </div>
           ))}
         </div>

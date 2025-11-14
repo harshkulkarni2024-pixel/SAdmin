@@ -20,6 +20,15 @@ const GOALS = [
     { key: 'education', text: 'آموزش یا اطلاع‌رسانی', emoji: '💡' },
 ];
 
+const formatTextForDisplay = (text: string): string => {
+    if (!text) return '';
+    const urlPattern = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+    return text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(urlPattern, url => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-violet-400 hover:underline break-all">${url}</a>`)
+        .replace(/\n/g, '<br />');
+};
+
 const StoryGenerator: React.FC<StoryGeneratorProps> = () => {
     const { user, updateUser: onUserUpdate } = useUser();
     const showNotification = useNotification();
@@ -151,13 +160,13 @@ const StoryGenerator: React.FC<StoryGeneratorProps> = () => {
                 {slide.recordingInstruction && (
                      <div>
                         <p className="font-semibold text-teal-300">لوکیشن و استایل:</p>
-                        <p className="text-slate-300 whitespace-pre-wrap">{slide.recordingInstruction}</p>
+                        <div className="text-slate-300 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: formatTextForDisplay(slide.recordingInstruction) }} />
                     </div>
                 )}
                 {slide.instruction && (
                      <div>
                         <p className="font-semibold text-violet-300">دیالوگ:</p>
-                        <p className="text-slate-300 whitespace-pre-wrap">{slide.instruction}</p>
+                        <div className="text-slate-300 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: formatTextForDisplay(slide.instruction) }} />
                     </div>
                 )}
                  {slide.storyText && (
@@ -168,7 +177,7 @@ const StoryGenerator: React.FC<StoryGeneratorProps> = () => {
                                 {copiedSlide === index ? 'کپی شد!' : 'کپی متن روی استوری'}
                             </button>
                          </div>
-                        <p className="text-white whitespace-pre-wrap mt-2">{slide.storyText}</p>
+                        <div className="text-white whitespace-pre-wrap mt-2" dangerouslySetInnerHTML={{ __html: formatTextForDisplay(slide.storyText) }} />
                     </div>
                 )}
             </div>
