@@ -18,6 +18,15 @@ interface AnalysisResult {
     created_at: string;
 }
 
+const formatTextForDisplay = (text: string): string => {
+    if (!text) return '';
+    const urlPattern = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+    return text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(urlPattern, url => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-violet-400 hover:underline break-all">${url}</a>`)
+        .replace(/\n/g, '<br />');
+};
+
 // Map DB history type to local state type
 const mapHistoryToResult = (hist: CompetitorAnalysisHistory): AnalysisResult => ({
     ...hist,
@@ -211,7 +220,7 @@ const CompetitorAnalysis: React.FC<CompetitorAnalysisProps> = () => {
 
                          <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
                              <h3 className="text-xl font-bold text-violet-400 mb-2">تحلیل بصری</h3>
-                             <p className="text-slate-300 whitespace-pre-wrap">{analysisResult.visual_analysis}</p>
+                             <div className="text-slate-300 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: formatTextForDisplay(analysisResult.visual_analysis) }} />
                          </div>
                     </div>
                 </div>

@@ -12,6 +12,16 @@ interface PostScenariosProps {
   setActiveView: (view: UserViewType) => void;
 }
 
+const formatTextForDisplay = (text: string): string => {
+    if (!text) return '';
+    const urlPattern = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+    // The AI might use markdown for bolding. Let's handle that too for consistency.
+    return text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(urlPattern, url => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-violet-400 hover:underline break-all">${url}</a>`)
+        .replace(/\n/g, '<br />');
+};
+
 const PostScenarios: React.FC<PostScenariosProps> = ({ setActiveView }) => {
     const { user, updateUser: onUserUpdate } = useUser();
     const showNotification = useNotification();
@@ -111,7 +121,7 @@ const PostScenarios: React.FC<PostScenariosProps> = ({ setActiveView }) => {
                 </button>
                 <div className="bg-slate-800 p-6 rounded-lg">
                     <h2 className="text-2xl font-bold mb-4 text-white">🎬 سناریو شماره {selectedScenario.scenario_number}</h2>
-                    <p className="text-slate-300 whitespace-pre-wrap">{selectedScenario.content}</p>
+                    <div className="text-slate-300 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: formatTextForDisplay(selectedScenario.content) }} />
                     
                     <div className="mt-6 border-t border-slate-700 pt-6 space-y-3">
                          <div className="flex flex-col sm:flex-row gap-3">
@@ -136,13 +146,13 @@ const PostScenarios: React.FC<PostScenariosProps> = ({ setActiveView }) => {
                     {generatedContent.hooks && (
                         <details className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
                             <summary className="font-semibold cursor-pointer text-violet-300">✨ مشاهده ۵۰ قلاب تولید شده</summary>
-                            <div className="prose prose-sm prose-invert max-w-none prose-p:my-1 prose-ol:pl-4 whitespace-pre-wrap mt-4" dangerouslySetInnerHTML={{ __html: generatedContent.hooks.replace(/\n/g, '<br/>') }} />
+                            <div className="prose prose-sm prose-invert max-w-none prose-p:my-1 prose-ol:pl-4 whitespace-pre-wrap mt-4" dangerouslySetInnerHTML={{ __html: formatTextForDisplay(generatedContent.hooks) }} />
                         </details>
                     )}
                     {generatedContent.ctas && (
                         <details className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
                             <summary className="font-semibold cursor-pointer text-violet-300">🚀 مشاهده ۵۰ کال تو اکشن تولید شده</summary>
-                            <div className="prose prose-sm prose-invert max-w-none prose-p:my-1 prose-ol:pl-4 whitespace-pre-wrap mt-4" dangerouslySetInnerHTML={{ __html: generatedContent.ctas.replace(/\n/g, '<br/>') }} />
+                            <div className="prose prose-sm prose-invert max-w-none prose-p:my-1 prose-ol:pl-4 whitespace-pre-wrap mt-4" dangerouslySetInnerHTML={{ __html: formatTextForDisplay(generatedContent.ctas) }} />
                         </details>
                     )}
                 </div>

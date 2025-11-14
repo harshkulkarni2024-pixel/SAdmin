@@ -24,6 +24,14 @@ const parseReportContent = (content: string) => {
     return { delivered, uploaded, pending, editing };
 };
 
+const formatTextForDisplay = (text: string): string => {
+    if (!text) return '';
+    const urlPattern = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+    return text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(urlPattern, url => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-violet-400 hover:underline break-all">${url}</a>`)
+        .replace(/\n/g, '<br />');
+};
 
 const Reports: React.FC<ReportsProps> = () => {
   const { user } = useUser();
@@ -96,7 +104,7 @@ const Reports: React.FC<ReportsProps> = () => {
                     </div>
                 </div>
 
-                <p className="text-slate-300 whitespace-pre-wrap pt-4 border-t border-slate-700">{report.content}</p>
+                <div className="text-slate-300 whitespace-pre-wrap pt-4 border-t border-slate-700" dangerouslySetInnerHTML={{ __html: formatTextForDisplay(report.content) }} />
               </div>
             );
           })}

@@ -15,8 +15,12 @@ const AlgorithmNews: React.FC = () => {
             try {
                 const data = await getLatestAlgorithmNews();
                 if (data) {
+                    const urlPattern = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
                     // Pre-format the content for rendering
-                    data.content = data.content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br />');
+                    data.content = data.content
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        .replace(urlPattern, url => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-violet-400 hover:underline break-all">${url}</a>`)
+                        .replace(/\n/g, '<br />');
                     setNews(data);
                 } else {
                     setError('محتوایی برای نمایش یافت نشد.');
