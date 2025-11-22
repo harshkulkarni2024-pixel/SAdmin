@@ -60,32 +60,36 @@ const PostScenarios: React.FC<PostScenariosProps> = ({ setActiveView }) => {
     const handleRecord = async (scenarioId: number) => {
         if (!user) return;
         setIsLoading(true);
-        showNotification('عالی! در حال تولید کپشن و ارسال برای تدوینگر...', 'info');
+        showNotification('در حال پردازش...', 'info');
         const scenarioToProcess = await db.getScenarioById(scenarioId);
         if (scenarioToProcess) {
             try {
-                // 1. Generate Caption
-                const captionContent = await generateCaption(user.about_info || '', scenarioToProcess.content);
-                
-                if (captionContent && captionContent.includes(AI_INIT_ERROR)) {
-                    throw new Error(AI_INIT_ERROR);
-                }
-                
-                if (captionContent && captionContent.trim()) {
-                    const captionTitle = `کپشن سناریو شماره ${scenarioToProcess.scenario_number}`;
-                    await db.addCaption(user.user_id, captionTitle, captionContent, scenarioToProcess.content);
-                } else {
-                     throw new Error("پاسخ خالی از هوش مصنوعی دریافت شد.");
+                // 1. Try Generate Caption (Non-blocking)
+                try {
+                    const captionContent = await generateCaption(user.about_info || '', scenarioToProcess.content);
+                    
+                    if (captionContent && captionContent.includes(AI_INIT_ERROR)) {
+                         console.warn("AI Init Error detected in caption generation");
+                         // We don't throw here to allow the process to continue to editor task creation
+                    } else if (captionContent && captionContent.trim()) {
+                        const captionTitle = `کپشن سناریو شماره ${scenarioToProcess.scenario_number}`;
+                        await db.addCaption(user.user_id, captionTitle, captionContent, scenarioToProcess.content);
+                        showNotification('کپشن با موفقیت تولید شد.', 'success');
+                    }
+                } catch (aiError) {
+                    console.error("Caption generation failed:", aiError);
+                    showNotification('تولید کپشن با خطا مواجه شد، اما سناریو برای تدوین ارسال می‌شود.', 'info');
                 }
 
-                // 2. Create Editor Task
+                // 2. Create Editor Task (Always happens)
                 await db.createEditorTask(user.user_id, scenarioToProcess.content, scenarioToProcess.scenario_number);
 
                 await db.logActivity(user.user_id, `سناریو شماره ${scenarioToProcess.scenario_number} را تایید و برای تدوین ارسال کرد.`);
-                showNotification(`آفرین! کپشن تولید شد و ویدیو برای تدوینگر ارسال گردید.`, 'success');
-
+                
                 // 3. Delete the original scenario from user's list
                 await db.deleteScenario(scenarioId);
+                
+                showNotification(`ویدیو با موفقیت برای تدوینگر ارسال شد.`, 'success');
 
             } catch (err) {
                 const errorMessage = (err as Error).message;

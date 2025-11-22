@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { User, PostScenario, PostIdea, SubscriptionHistory, Plan, Report } from '../../types';
 import * as db from '../../services/dbService';
@@ -260,20 +261,35 @@ const UserDetails: React.FC<UserDetailsProps> = ({ user, onBack, onUpdate }) => 
     }
     
     const handleDeleteScenario = async (id: number) => {
-        if (window.confirm('با حذف این سناریو، یک کپشن برای کاربر تولید شده و سناریو بایگانی می‌شود. آیا مطمئن هستید؟')) {
+        // Updated logic: Behave like user "Recorded" button
+        if (window.confirm('آیا مطمئن هستید؟ این سناریو تایید شده و برای تدوین ارسال خواهد شد (مشابه دکمه "ضبط کردم" کاربر).')) {
             const scenarioToDelete = scenarios.find(s => s.id === id);
             if (scenarioToDelete) {
                 try {
-                    const captionContent = await generateCaption(user.about_info || '', scenarioToDelete.content);
-                    const captionTitle = `کپشن سناریو شماره ${scenarioToDelete.scenario_number}`;
-                    await db.addCaption(user.user_id, captionTitle, captionContent, scenarioToDelete.content);
-                } catch (error) {
-                    console.error("Caption generation failed during admin delete:", error);
-                    alert("تولید کپشن خودکار با خطا مواجه شد، اما سناریو حذف می‌شود.");
-                } finally {
+                    // 1. Try Generate Caption (Non-blocking)
+                    try {
+                        const captionContent = await generateCaption(user.about_info || '', scenarioToDelete.content);
+                        if (captionContent && !captionContent.includes("Error") && captionContent.trim()) {
+                             const captionTitle = `کپشن سناریو شماره ${scenarioToDelete.scenario_number}`;
+                             await db.addCaption(user.user_id, captionTitle, captionContent, scenarioToDelete.content);
+                        }
+                    } catch (error) {
+                        console.error("Caption generation failed during admin delete:", error);
+                        // Continue despite caption failure
+                    } 
+                    
+                    // 2. Create Editor Task (Critical step)
+                    await db.createEditorTask(user.user_id, scenarioToDelete.content, scenarioToDelete.scenario_number);
+
+                    // 3. Delete Scenario
                     await db.deleteScenario(id);
-                    await db.logActivity(user.user_id, `سناریوی شماره ${scenarioToDelete.scenario_number} توسط مدیر حذف شد.`);
+                    
+                    await db.logActivity(user.user_id, `سناریوی شماره ${scenarioToDelete.scenario_number} توسط مدیر تایید و به لیست تدوین اضافه شد.`);
+                    
+                    showNotification('سناریو برای تدوین ارسال شد.');
                     refreshData(currentUser);
+                } catch (e) {
+                     showNotification(`خطا در عملیات: ${(e as Error).message}`);
                 }
             }
         }
