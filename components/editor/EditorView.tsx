@@ -24,7 +24,7 @@ const EditorView: React.FC = () => {
             setTasks(editorTasks);
         } catch (error) {
             console.error(error);
-            showNotification('خطا در دریافت لیست تسک‌ها', 'error');
+            showNotification('خطا در دریافت لیست پروژه‌ها', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -37,7 +37,7 @@ const EditorView: React.FC = () => {
     const handleStatusUpdate = async (taskId: number, status: EditorTask['status'], note?: string) => {
         try {
             await db.updateEditorTaskStatus(taskId, status, note);
-            showNotification(status === 'delivered' ? 'تسک با موفقیت تحویل داده شد.' : 'گزارش مشکل ثبت شد.', 'success');
+            showNotification(status === 'delivered' ? 'پروژه با موفقیت تحویل داده شد.' : 'گزارش مشکل ثبت شد.', 'success');
             fetchTasks();
             setIssueModalTask(null);
             setIssueText('');
@@ -96,7 +96,7 @@ const EditorView: React.FC = () => {
                     <div className="flex justify-center pt-20"><Loader /></div>
                 ) : filteredTasks.length === 0 ? (
                     <div className="text-center pt-20 text-slate-500">
-                        <p>هیچ تسک تدوینی یافت نشد.</p>
+                        <p>هیچ پروژه تدوینی یافت نشد.</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

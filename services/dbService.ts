@@ -1,3 +1,4 @@
+
 import type { User, PostScenario, Plan, Report, Caption, PostIdea, ActivityLog, ChatMessage, SubscriptionHistory, AlgorithmNews, CompetitorAnalysisHistory, EditorTask } from '../types';
 import { supabase, SUPABASE_INIT_ERROR } from './supabaseClient';
 
@@ -193,38 +194,37 @@ export const addUser = async (fullName: string, accessCode: string, isVip: boole
 
 export const addEditor = async (fullName: string, accessCode: string): Promise<{ success: boolean, message: string }> => {
     if (!supabase) return { success: false, message: SUPABASE_INIT_ERROR };
-
-    const { data: existingUser } = await supabase.from('users').select('user_id').eq('access_code', accessCode).single();
+    
+    const { data: existingUser, error: checkError } = await supabase.from('users').select('user_id').eq('access_code', accessCode).single();
+    if (checkError && checkError.code !== 'PGRST116') {
+        handleError(checkError, 'addEditor:check');
+        return { success: false, message: 'خطا در بررسی کد دسترسی.' };
+    }
     if (existingUser) {
         return { success: false, message: 'این کد دسترسی قبلاً استفاده شده است.' };
     }
-
-    const newEditor: Omit<User, 'user_id'> & { user_id?: number } = {
+    
+    const newEditor = {
+        user_id: Date.now(),
         full_name: fullName,
         access_code: accessCode,
         is_verified: true,
         role: 'editor',
+        // Default values for required fields in DB
         story_requests: 0,
         caption_idea_requests: 0,
         chat_messages: 0,
-        story_limit: 0,
-        caption_idea_limit: 0,
-        chat_limit: 0,
         last_request_date: new Date().toISOString().split('T')[0],
-        last_weekly_reset_date: new Date().toISOString().split('T')[0],
-        about_info: 'Editor Account',
-        preferred_name: fullName,
-        is_vip: false,
+        is_vip: false
     };
-    newEditor.user_id = Date.now(); // Simple unique ID generation
-
+    
     const { error } = await supabase.from('users').insert(newEditor);
     if (error) {
-        handleError(error, 'addEditor');
+        handleError(error, 'addEditor:insert');
         return { success: false, message: `خطا در افزودن تدوینگر: ${error.message}` };
     }
     return { success: true, message: `تدوینگر '${fullName}' با موفقیت اضافه شد.` };
-}
+};
 
 export const deleteUser = async (userId: number): Promise<void> => {
     if (!supabase) throw new Error(SUPABASE_INIT_ERROR);

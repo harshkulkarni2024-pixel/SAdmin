@@ -45,10 +45,10 @@ const EditorTaskManagement: React.FC = () => {
         if (!editorId) return;
         try {
             await db.assignEditorTask(taskId, parseInt(editorId), note);
-            showNotification('تسک با موفقیت به تدوینگر اختصاص یافت.', 'success');
+            showNotification('تدوین با موفقیت به تدوینگر اختصاص یافت.', 'success');
             fetchData();
         } catch (error) {
-            showNotification('خطا در اختصاص تسک.', 'error');
+            showNotification('خطا در اختصاص پروژه.', 'error');
         }
     };
 
@@ -206,7 +206,7 @@ const EditorTaskManagement: React.FC = () => {
         };
 
         const handleDeleteEditor = async (id: number) => {
-            if(confirm('آیا مطمئن هستید؟ با حذف تدوینگر، تمام تسک‌های اختصاص داده شده به او بی‌صاحب خواهند شد.')) {
+            if(confirm('آیا مطمئن هستید؟ با حذف تدوینگر، تمام پروژه‌های اختصاص داده شده به او بی‌صاحب خواهند شد.')) {
                 await db.deleteUser(id);
                 showNotification('تدوینگر با موفقیت حذف شد.', 'success');
                 fetchData();
