@@ -2,7 +2,9 @@
 
 
 
-import type { User, PostScenario, Plan, Report, Caption, PostIdea, ActivityLog, ChatMessage, SubscriptionHistory, AlgorithmNews, CompetitorAnalysisHistory } from '../types';
+
+
+import type { User, PostScenario, Plan, Report, Caption, PostIdea, ActivityLog, ChatMessage, SubscriptionHistory, AlgorithmNews, CompetitorAnalysisHistory, EditorTask } from '../types';
 import { supabase, SUPABASE_INIT_ERROR } from './supabaseClient';
 
 // --- Constants ---
@@ -43,18 +45,36 @@ export const verifyAccessCode = async (code: string, isSessionLogin: boolean = f
     }
 
     if (!user) {
+        // Special handling for hardcoded admin fallback if DB is empty/fresh
         if (!isSessionLogin && code === ADMIN_DB_ACCESS_CODE) {
              const { data: adminUser, error: adminError } = await supabase.from('users').select('*').eq('user_id', ADMIN_IDS[0]).single();
              if (adminError) {
-                 handleError(adminError, 'verifyAccessCode:admin');
-                 throw new Error(`خطای پایگاه داده هنگام بررسی مدیر: ${adminError.message}`);
+                 // If database is fresh and no admin exists, return a mock admin for first-time setup instructions
+                 return {
+                     user_id: ADMIN_IDS[0],
+                     full_name: 'مدیر سیستم',
+                     access_code: ADMIN_DB_ACCESS_CODE,
+                     is_verified: true,
+                     role: 'admin',
+                     story_requests: 0,
+                     chat_messages: 0,
+                     last_request_date: new Date().toISOString(),
+                 } as User;
              }
-             return adminUser;
+             return { ...adminUser, role: 'admin' };
         }
         return null;
     }
     
-    if (user && !isUserAdmin(user.user_id)) {
+    // Assign roles based on data or hardcoded logic
+    if (isUserAdmin(user.user_id)) {
+        user.role = 'admin';
+    } else if (user.role !== 'editor') {
+        // Ensure regular users have 'user' role if not specified
+        user.role = 'user';
+    }
+
+    if (user.role === 'user') {
         const expires = user.subscription_expires_at ? new Date(user.subscription_expires_at) : null;
         if (!expires || expires < new Date()) {
             user.is_subscription_expired = true;
@@ -62,37 +82,40 @@ export const verifyAccessCode = async (code: string, isSessionLogin: boolean = f
         }
     }
 
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
-    let updatePayload: {[key: string]: any} = {};
-    let needsUpdate = false;
+    // Update usage stats only for regular users
+    if (user.role === 'user') {
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
+        let updatePayload: {[key: string]: any} = {};
+        let needsUpdate = false;
 
-    if (user.last_request_date !== todayStr) {
-        updatePayload.story_requests = 0;
-        updatePayload.caption_idea_requests = 0;
-        updatePayload.last_request_date = todayStr;
-        needsUpdate = true;
-    }
+        if (user.last_request_date !== todayStr) {
+            updatePayload.story_requests = 0;
+            updatePayload.caption_idea_requests = 0;
+            updatePayload.last_request_date = todayStr;
+            needsUpdate = true;
+        }
 
-    const lastWeeklyReset = user.last_weekly_reset_date ? new Date(user.last_weekly_reset_date) : new Date(0);
-    const oneWeek = 7 * 24 * 60 * 60 * 1000;
-    if (today.getTime() - lastWeeklyReset.getTime() > oneWeek) {
-        updatePayload.chat_messages = 0;
-        updatePayload.last_weekly_reset_date = todayStr;
-        needsUpdate = true;
-    }
+        const lastWeeklyReset = user.last_weekly_reset_date ? new Date(user.last_weekly_reset_date) : new Date(0);
+        const oneWeek = 7 * 24 * 60 * 60 * 1000;
+        if (today.getTime() - lastWeeklyReset.getTime() > oneWeek) {
+            updatePayload.chat_messages = 0;
+            updatePayload.last_weekly_reset_date = todayStr;
+            needsUpdate = true;
+        }
 
-    if (needsUpdate) {
-        const { error: updateError } = await supabase.from('users').update(updatePayload).eq('user_id', user.user_id);
+        if (needsUpdate) {
+            const { error: updateError } = await supabase.from('users').update(updatePayload).eq('user_id', user.user_id);
 
-        if (updateError) {
-            handleError(updateError, 'verifyAccessCode:updateUsage');
-        } else {
-            if (updatePayload.story_requests === 0) user.story_requests = 0;
-            if (updatePayload.caption_idea_requests === 0) user.caption_idea_requests = 0;
-            if (updatePayload.last_request_date) user.last_request_date = updatePayload.last_request_date;
-            if (updatePayload.chat_messages === 0) user.chat_messages = 0;
-            if (updatePayload.last_weekly_reset_date) user.last_weekly_reset_date = updatePayload.last_weekly_reset_date;
+            if (updateError) {
+                handleError(updateError, 'verifyAccessCode:updateUsage');
+            } else {
+                if (updatePayload.story_requests === 0) user.story_requests = 0;
+                if (updatePayload.caption_idea_requests === 0) user.caption_idea_requests = 0;
+                if (updatePayload.last_request_date) user.last_request_date = updatePayload.last_request_date;
+                if (updatePayload.chat_messages === 0) user.chat_messages = 0;
+                if (updatePayload.last_weekly_reset_date) user.last_weekly_reset_date = updatePayload.last_weekly_reset_date;
+            }
         }
     }
     
@@ -105,8 +128,21 @@ export const verifyAccessCode = async (code: string, isSessionLogin: boolean = f
 
 export const getAllUsers = async (): Promise<User[]> => {
     if (!supabase) throw new Error(SUPABASE_INIT_ERROR);
-    const { data, error } = await supabase.from('users').select('*').neq('user_id', ADMIN_IDS[0]);
+    // Exclude admin and editors from the general user list
+    const { data, error } = await supabase.from('users')
+        .select('*')
+        .neq('user_id', ADMIN_IDS[0])
+        .neq('role', 'editor')
+        .or('role.is.null,role.eq.user'); // Handle legacy rows where role might be null
+        
     if (error) handleError(error, 'getAllUsers');
+    return data || [];
+};
+
+export const getAllEditors = async (): Promise<User[]> => {
+    if (!supabase) throw new Error(SUPABASE_INIT_ERROR);
+    const { data, error } = await supabase.from('users').select('*').eq('role', 'editor');
+    if (error) handleError(error, 'getAllEditors');
     return data || [];
 };
 
@@ -136,6 +172,7 @@ export const addUser = async (fullName: string, accessCode: string, isVip: boole
         full_name: fullName,
         access_code: accessCode,
         is_verified: true,
+        role: 'user',
         story_requests: 0,
         caption_idea_requests: 0,
         chat_messages: 0,
@@ -170,9 +207,6 @@ export const updateUserInfo = async (userId: number, info: { about_info: string,
     if (!supabase) throw new Error(SUPABASE_INIT_ERROR);
     const { error } = await supabase.from('users').update({ about_info: info.about_info, preferred_name: info.preferred_name }).eq('user_id', userId);
     if (error) {
-        if (error.message.includes("preferred_name") && error.message.includes("column") && error.message.includes("users")) {
-             throw new Error(`خطای پایگاه داده: ستون 'preferred_name' در جدول 'users' پیدا نشد.\n\nلطفاً اسکریپت SQL راهنمای موجود در انتهای همین فایل ('services/dbService.ts') را اجرا کنید تا ستون‌های مورد نیاز به جدول کاربران اضافه شوند.`);
-        }
         handleError(error, 'updateUserInfo');
         throw new Error(error.message);
     }
@@ -385,6 +419,70 @@ export const deleteScenario = async (scenarioId: number): Promise<void> => {
     if (error) handleError(error, 'deleteScenario');
 };
 
+// --- Editor Tasks Management ---
+
+export const createEditorTask = async (clientUserId: number, scenarioContent: string, scenarioNumber: number): Promise<void> => {
+    if (!supabase) return;
+    const { error } = await supabase.from('editor_tasks').insert({
+        client_user_id: clientUserId,
+        scenario_content: scenarioContent,
+        scenario_number: scenarioNumber,
+        status: 'pending_assignment',
+    });
+    if (error) handleError(error, 'createEditorTask');
+};
+
+export const getEditorTasks = async (editorId?: number): Promise<EditorTask[]> => {
+    if (!supabase) return [];
+    let query = supabase
+        .from('editor_tasks')
+        .select(`
+            *,
+            client_name:client_user_id(full_name),
+            editor_name:assigned_editor_id(full_name)
+        `)
+        .order('created_at', { ascending: false });
+
+    if (editorId) {
+        query = query.eq('assigned_editor_id', editorId);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+        handleError(error, 'getEditorTasks');
+        return [];
+    }
+    
+    // Flatten the joined data for simpler consumption in UI
+    return data.map((task: any) => ({
+        ...task,
+        client_name: task.client_name?.full_name || 'کاربر حذف شده',
+        editor_name: task.editor_name?.full_name || 'تعیین نشده'
+    }));
+};
+
+export const assignEditorTask = async (taskId: number, editorId: number, adminNote?: string): Promise<void> => {
+    if (!supabase) return;
+    const { error } = await supabase.from('editor_tasks').update({
+        assigned_editor_id: editorId,
+        status: 'assigned',
+        admin_note: adminNote,
+        updated_at: new Date().toISOString()
+    }).eq('id', taskId);
+    if (error) handleError(error, 'assignEditorTask');
+};
+
+export const updateEditorTaskStatus = async (taskId: number, status: EditorTask['status'], editorNote?: string): Promise<void> => {
+    if (!supabase) return;
+    const updatePayload: any = { status, updated_at: new Date().toISOString() };
+    if (editorNote !== undefined) {
+        updatePayload.editor_note = editorNote;
+    }
+    const { error } = await supabase.from('editor_tasks').update(updatePayload).eq('id', taskId);
+    if (error) handleError(error, 'updateEditorTaskStatus');
+};
+
+
 // --- Ideas ---
 export const getIdeasForUser = async (userId: number): Promise<PostIdea[]> => {
     if (!supabase) return [];
@@ -548,8 +646,8 @@ export const getNotificationCounts = async (userId: number): Promise<{ scenarios
     return { scenarios: newScenariosCount, plans: newPlansCount, reports: newReportsCount };
 };
 
-export const getAdminNotificationCounts = async (): Promise<{ ideas: number, logs: number }> => {
-    if (!supabase) return { ideas: 0, logs: 0 };
+export const getAdminNotificationCounts = async (): Promise<{ ideas: number, logs: number, tasks: number }> => {
+    if (!supabase) return { ideas: 0, logs: 0, tasks: 0 };
     const { count: ideasCount, error: iError } = await supabase.from('ideas').select('id', { count: 'exact' });
     if (iError) handleError(iError, 'getAdminNotificationCounts:ideas');
 
@@ -559,7 +657,10 @@ export const getAdminNotificationCounts = async (): Promise<{ ideas: number, log
     const { count: logsCount, error: lError } = await supabase.from('activity_logs').select('*', { count: 'exact', head: true }).gt('created_at', lastLogTime);
     if (lError) handleError(lError, 'getAdminNotificationCounts:logs');
 
-    return { ideas: ideasCount || 0, logs: logsCount || 0 };
+    const { count: tasksCount, error: tError } = await supabase.from('editor_tasks').select('*', { count: 'exact', head: true }).eq('status', 'pending_assignment');
+    if (tError) handleError(tError, 'getAdminNotificationCounts:tasks');
+
+    return { ideas: ideasCount || 0, logs: logsCount || 0, tasks: tasksCount || 0 };
 };
 
 export const clearUserNotifications = (section: 'scenarios' | 'plans' | 'reports', userId: number): void => {
@@ -575,137 +676,46 @@ export const clearAdminNotifications = (section: 'ideas' | 'logs'): void => {
 
 // --- SQL SCRIPTS for Supabase --
 /*
--- This script should be run in the Supabase SQL Editor.
--- It is designed to be safely rerunnable and corrects previous policy errors.
+-- SQL FOR EDITOR TASK MANAGEMENT (RUN THIS IN SUPABASE SQL EDITOR)
 
--- Function for incrementing usage
-CREATE OR REPLACE FUNCTION increment_usage(p_user_id bigint, p_column text)
-RETURNS void AS $$
-BEGIN
-  EXECUTE format('UPDATE users SET %I = %I + 1 WHERE user_id = %L', p_column, p_column, p_user_id);
-END;
-$$ LANGUAGE plpgsql;
+-- 1. Add role column to users
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user';
 
--- SQL for Subscription Feature
-ALTER TABLE public.users ADD COLUMN IF NOT EXISTS subscription_expires_at TIMESTAMPTZ;
-ALTER TABLE public.users ADD COLUMN IF NOT EXISTS preferred_name TEXT;
--- FIX FOR MISSING LIMIT COLUMNS (Run these if you get errors in the admin panel)
-ALTER TABLE public.users ADD COLUMN IF NOT EXISTS story_limit INTEGER DEFAULT 2 NOT NULL;
-ALTER TABLE public.users ADD COLUMN IF NOT EXISTS chat_limit INTEGER DEFAULT 150 NOT NULL;
-ALTER TABLE public.users ADD COLUMN IF NOT EXISTS caption_idea_requests INTEGER DEFAULT 0 NOT NULL;
-ALTER TABLE public.users ADD COLUMN IF NOT EXISTS caption_idea_limit INTEGER DEFAULT 5 NOT NULL;
-CREATE TABLE IF NOT EXISTS public.subscription_history (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, user_id BIGINT REFERENCES public.users(user_id) ON DELETE CASCADE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), extended_for_days INT NOT NULL, new_expiry_date TIMESTAMPTZ NOT NULL);
-ALTER TABLE public.subscription_history ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Allow authenticated users to read their own history" ON public.subscription_history;
-DROP POLICY IF EXISTS "Allow users to read their own history" ON public.subscription_history;
-CREATE POLICY "Allow users to read their own history" ON public.subscription_history FOR SELECT TO authenticated, anon USING (true);
-DROP POLICY IF EXISTS "Allow full access for service_role" ON public.subscription_history;
-CREATE POLICY "Allow full access for service_role" ON public.subscription_history FOR ALL TO service_role USING (true);
-CREATE OR REPLACE FUNCTION extend_subscription(p_user_id BIGINT, p_days_to_add INT) RETURNS VOID AS $$ DECLARE v_current_expiry TIMESTAMPTZ; v_new_expiry TIMESTAMPTZ; BEGIN SELECT subscription_expires_at INTO v_current_expiry FROM public.users WHERE user_id = p_user_id; IF v_current_expiry IS NULL OR v_current_expiry < NOW() THEN v_new_expiry := NOW() + (p_days_to_add || ' days')::INTERVAL; ELSE v_new_expiry := v_current_expiry + (p_days_to_add || ' days')::INTERVAL; END IF; UPDATE public.users SET subscription_expires_at = v_new_expiry WHERE user_id = p_user_id; INSERT INTO public.subscription_history (user_id, extended_for_days, new_expiry_date) VALUES (p_user_id, p_days_to_add, v_new_expiry); END; $$ LANGUAGE plpgsql SECURITY DEFINER;
-
-
--- ====================================================================
--- FINAL FIX SCRIPT for algorithm_news table (v2 - Corrected Syntax)
--- ====================================================================
--- This script completely rebuilds the 'algorithm_news' table and its
--- security policies to fix the auto-increment 'id' issue.
--- The incorrect RAISE NOTICE calls have been removed.
--- ====================================================================
-
--- Start a transaction to ensure all steps succeed or fail together.
-BEGIN;
-
--- Step 1: Securely rename the existing table to back it up.
-DO $$
-BEGIN
-  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'algorithm_news') THEN
-    ALTER TABLE public.algorithm_news RENAME TO algorithm_news_old_backup;
-    RAISE NOTICE 'Old "algorithm_news" table renamed to "algorithm_news_old_backup".';
-  END IF;
-END;
-$$;
-
--- Step 2: Create a new, correctly structured 'algorithm_news' table.
-CREATE TABLE public.algorithm_news (
-  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-  content TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- Step 3: Copy the data from the backup table to the new table.
-DO $$
-BEGIN
-  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'algorithm_news_old_backup') THEN
-    RAISE NOTICE 'Copying data from backup table...';
-    INSERT INTO public.algorithm_news (content, created_at, updated_at)
-    SELECT content, created_at, updated_at FROM public.algorithm_news_old_backup
-    ORDER BY created_at;
-  END IF;
-END;
-$$;
-
--- Step 4: Drop the old backup table.
-DO $$
-BEGIN
-  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'algorithm_news_old_backup') THEN
-    DROP TABLE public.algorithm_news_old_backup;
-    RAISE NOTICE 'Backup table "algorithm_news_old_backup" dropped.';
-  END IF;
-END;
-$$;
-
--- Step 5: Configure Row Level Security (RLS) policies.
-ALTER TABLE public.algorithm_news ENABLE ROW LEVEL SECURITY;
-
--- Policy for READING: Anyone can read the news.
-DROP POLICY IF EXISTS "Allow public read access to news" ON public.algorithm_news;
-CREATE POLICY "Allow public read access to news"
-  ON public.algorithm_news
-  FOR SELECT
-  USING (true);
-
--- Policy for INSERTING: Allows any client using the anon key to insert.
-DROP POLICY IF EXISTS "Allow anonymous inserts for news" ON public.algorithm_news;
-CREATE POLICY "Allow anonymous inserts for news"
-  ON public.algorithm_news
-  FOR INSERT
-  WITH CHECK (true);
-
--- Policy for DELETING/UPDATING: Only the master 'service_role' can modify/delete.
-DROP POLICY IF EXISTS "Allow service_role full access" ON public.algorithm_news;
-CREATE POLICY "Allow service_role full access"
-    ON public.algorithm_news
-    FOR ALL
-    USING (true)
-    WITH CHECK (true);
-
--- Step 6: Add an initial record if the table is empty.
-INSERT INTO public.algorithm_news (content)
-SELECT 'هنوز خبری ثبت نشده است. لطفاً از پنل مدیریت اولین خبر را وارد کنید.'
-WHERE NOT EXISTS (SELECT 1 FROM public.algorithm_news);
-
--- Commit the transaction.
-COMMIT;
-
--- Final success message that is valid SQL.
-SELECT 'Script finished successfully!' as result;
-
-
--- SQL for Competitor Analysis History
-CREATE TABLE IF NOT EXISTS public.competitor_analysis_history (
+-- 2. Create editor_tasks table
+CREATE TABLE IF NOT EXISTS public.editor_tasks (
     id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-    user_id BIGINT REFERENCES public.users(user_id) ON DELETE CASCADE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    instagram_id TEXT NOT NULL,
-    visual_analysis TEXT,
-    web_analysis TEXT
+    client_user_id BIGINT REFERENCES public.users(user_id) ON DELETE CASCADE,
+    scenario_content TEXT NOT NULL,
+    scenario_number INTEGER NOT NULL,
+    assigned_editor_id BIGINT REFERENCES public.users(user_id) ON DELETE SET NULL,
+    status TEXT CHECK (status IN ('pending_assignment', 'assigned', 'delivered', 'issue_reported')) DEFAULT 'pending_assignment',
+    admin_note TEXT,
+    editor_note TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-ALTER TABLE public.competitor_analysis_history ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Users can manage their own analysis history" ON public.competitor_analysis_history;
-CREATE POLICY "Users can manage their own analysis history" 
-ON public.competitor_analysis_history
-FOR ALL TO authenticated, anon
-USING (true);
 
+-- 3. Setup RLS for editor_tasks
+ALTER TABLE public.editor_tasks ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow access to editor tasks" ON public.editor_tasks;
+CREATE POLICY "Allow access to editor tasks"
+ON public.editor_tasks
+FOR ALL
+TO authenticated, anon
+USING (true)
+WITH CHECK (true);
+
+-- 4. Insert Editors (Zh1, Ar8, Mm12, Nw1, Ne8)
+-- This will insert them only if they don't exist (based on access_code)
+INSERT INTO public.users (user_id, full_name, access_code, is_verified, role, story_limit, chat_limit, caption_idea_limit, last_request_date)
+VALUES 
+(9001, 'تدوینگر Zh1', 'Zh1', true, 'editor', 0, 0, 0, NOW()),
+(9002, 'تدوینگر Ar8', 'Ar8', true, 'editor', 0, 0, 0, NOW()),
+(9003, 'تدوینگر Mm12', 'Mm12', true, 'editor', 0, 0, 0, NOW()),
+(9004, 'تدوینگر Nw1', 'Nw1', true, 'editor', 0, 0, 0, NOW()),
+(9005, 'تدوینگر Ne8', 'Ne8', true, 'editor', 0, 0, 0, NOW())
+ON CONFLICT (user_id) DO UPDATE SET role = 'editor';
+
+-- Note: You might need to manually adjust user_id sequence if you have user_ids > 9000 already.
 */

@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, PostScenario, Report } from '../../types';
+import { User, PostScenario, Report, EditorTask } from '../../types';
 import * as db from '../../services/dbService';
 import { Icon } from '../common/Icon';
 import { Loader } from '../common/Loader';
@@ -24,6 +25,13 @@ interface ScenarioStat {
     count: number;
 }
 
+interface EditorStat {
+    id: number;
+    name: string;
+    active: number;
+    delivered: number;
+}
+
 // Fix: Define the props interface for the component.
 interface AdminDashboardProps {
     onNavigate: (view: AdminViewType) => void;
@@ -40,15 +48,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [videoStats, setVideoStats] = useState<VideoStatsPerUser[]>([]);
     const [scenarioStats, setScenarioStats] = useState<ScenarioStat[]>([]);
+    const [editorStats, setEditorStats] = useState<EditorStat[]>([]);
 
     useEffect(() => {
         const fetchData = async () => {
             setIsLoading(true);
             try {
-                const [users, scenarios, reports] = await Promise.all([
+                const [users, scenarios, reports, editorTasks, editors] = await Promise.all([
                     db.getAllUsers(),
                     db.getAllScenarios(),
-                    db.getAllReports()
+                    db.getAllReports(),
+                    db.getEditorTasks(),
+                    db.getAllEditors()
                 ]);
 
                 const userMap = new Map(users.map(u => [u.user_id, u.full_name]));
@@ -102,6 +113,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
                     .sort((a, b) => b.count - a.count);
                 setScenarioStats(scenarioStatsData);
 
+                // Process Editor Stats
+                const editorMap: Record<number, {active: number, delivered: number}> = {};
+                editors.forEach(ed => editorMap[ed.user_id] = {active: 0, delivered: 0});
+                
+                editorTasks.forEach(task => {
+                    if (task.assigned_editor_id && editorMap[task.assigned_editor_id]) {
+                        if (task.status === 'delivered') {
+                            editorMap[task.assigned_editor_id].delivered++;
+                        } else if (task.status === 'assigned' || task.status === 'issue_reported') {
+                            editorMap[task.assigned_editor_id].active++;
+                        }
+                    }
+                });
+
+                const editorStatsData = editors.map(ed => ({
+                    id: ed.user_id,
+                    name: ed.full_name,
+                    active: editorMap[ed.user_id]?.active || 0,
+                    delivered: editorMap[ed.user_id]?.delivered || 0
+                }));
+                setEditorStats(editorStatsData);
+
             } catch (error) {
                 console.error("Failed to load dashboard data:", error);
             } finally {
@@ -126,18 +159,58 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
                 <p className="text-slate-400 mt-1">آمار کلی و وضعیت کاربران در یک نگاه.</p>
             </div>
 
-            <button onClick={() => onNavigate('users')} className="w-full bg-violet-600 p-4 rounded-xl flex items-center text-right group hover:bg-violet-700 transition-all duration-300 transform hover:-translate-y-1">
-                <div className="bg-white/10 p-3 rounded-full me-4">
-                    <Icon name="users" className="w-8 h-8 text-white" />
-                </div>
-                <div>
-                    <h3 className="text-xl font-bold text-white">مدیریت کاربران</h3>
-                    <p className="text-sm text-violet-200">مشاهده، افزودن یا ویرایش اطلاعات کاربران</p>
-                </div>
-            </button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button onClick={() => onNavigate('editor_tasks')} className="w-full bg-violet-600 p-4 rounded-xl flex items-center text-right group hover:bg-violet-700 transition-all duration-300 transform hover:-translate-y-1">
+                    <div className="bg-white/10 p-3 rounded-full me-4">
+                        <Icon name="video" className="w-8 h-8 text-white" />
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-bold text-white">مدیریت تدوین</h3>
+                        <p className="text-sm text-violet-200">تخصیص و پیگیری پروژه‌های تدوین</p>
+                    </div>
+                </button>
+
+                <button onClick={() => onNavigate('users')} className="w-full bg-slate-700 p-4 rounded-xl flex items-center text-right group hover:bg-slate-600 transition-all duration-300 transform hover:-translate-y-1">
+                    <div className="bg-white/10 p-3 rounded-full me-4">
+                        <Icon name="users" className="w-8 h-8 text-white" />
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-bold text-white">مدیریت کاربران</h3>
+                        <p className="text-sm text-slate-300">مشاهده و ویرایش اطلاعات کاربران</p>
+                    </div>
+                </button>
+            </div>
             
+            {/* Editors Performance Section */}
             <div className="bg-slate-800 p-6 rounded-xl">
-                <h2 className="text-xl font-bold text-white mb-4">سناریو در انتظار ضبط</h2>
+                <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                    <Icon name="chart-bar" className="w-6 h-6 text-violet-400"/>
+                    عملکرد تدوینگران
+                </h2>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-right text-sm text-slate-300">
+                        <thead className="text-slate-400 border-b border-slate-700">
+                            <tr>
+                                <th className="pb-3 font-medium">نام تدوینگر</th>
+                                <th className="pb-3 font-medium text-center">در حال انجام</th>
+                                <th className="pb-3 font-medium text-center">تحویل شده</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-700">
+                            {editorStats.map(ed => (
+                                <tr key={ed.id} className="hover:bg-slate-700/30">
+                                    <td className="py-3">{ed.name}</td>
+                                    <td className="py-3 text-center font-bold text-yellow-400">{ed.active}</td>
+                                    <td className="py-3 text-center font-bold text-green-400">{ed.delivered}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div className="bg-slate-800 p-6 rounded-xl">
+                <h2 className="text-xl font-bold text-white mb-4">سناریو در انتظار ضبط (کاربران)</h2>
                 {scenarioStats.length > 0 ? (
                      <div className="space-y-3">
                         {scenarioStats.map(stat => (
@@ -164,7 +237,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
             </div>
 
             <div className="bg-slate-800 p-6 rounded-xl">
-                 <h2 className="text-xl font-bold text-white mb-4">آمار محتوا</h2>
+                 <h2 className="text-xl font-bold text-white mb-4">آمار کلی محتوا</h2>
                  <div className="flex flex-wrap gap-x-4 gap-y-2 mb-4">
                      {STAT_ITEMS.map(item => (
                          <div key={item.key} className="flex items-center gap-2 text-xs">
