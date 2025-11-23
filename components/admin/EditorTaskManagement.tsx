@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { EditorTask, User } from '../../types';
 import * as db from '../../services/dbService';
 import { Icon } from '../common/Icon';
@@ -70,9 +70,83 @@ const EditorTaskManagement: React.FC = () => {
         });
 
         const TaskCard: React.FC<{ task: EditorTask }> = ({ task }) => {
-            const [taskEditorId, setTaskEditorId] = useState(task.assigned_editor_id?.toString() || '');
+            // Fix: Sync initial state with props using optional chaining and fallback
+            const [taskEditorId, setTaskEditorId] = useState(task.assigned_editor_id ? String(task.assigned_editor_id) : '');
             const [adminNote, setAdminNote] = useState(task.admin_note || '');
+            const [isRecording, setIsRecording] = useState(false);
+            const [isUploading, setIsUploading] = useState(false);
+            const fileInputRef = useRef<HTMLInputElement>(null);
+            const mediaRecorderRef = useRef<MediaRecorder | null>(null);
             const isAssigned = task.status !== 'pending_assignment';
+
+            // Fix: Update local state when prop changes (crucial for re-renders after fetch)
+            useEffect(() => {
+                setTaskEditorId(task.assigned_editor_id ? String(task.assigned_editor_id) : '');
+            }, [task.assigned_editor_id]);
+
+            useEffect(() => {
+                setAdminNote(task.admin_note || '');
+            }, [task.admin_note]);
+
+            const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                
+                setIsUploading(true);
+                const url = await db.uploadFile(file);
+                setIsUploading(false);
+                
+                if (url) {
+                    setAdminNote(prev => prev + `\n[فایل پیوست: ${url}]`);
+                    showNotification('فایل با موفقیت پیوست شد.', 'success');
+                } else {
+                    showNotification('خطا در آپلود فایل.', 'error');
+                }
+            };
+
+            const startRecording = async () => {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    showNotification('مرورگر شما از ضبط صدا پشتیبانی نمی‌کند.', 'error');
+                    return;
+                }
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    const recorder = new MediaRecorder(stream);
+                    const chunks: Blob[] = [];
+                    
+                    recorder.ondataavailable = (e) => chunks.push(e.data);
+                    recorder.onstop = async () => {
+                        const blob = new Blob(chunks, { type: 'audio/webm' });
+                        const file = new File([blob], `voice_note_${Date.now()}.webm`, { type: 'audio/webm' });
+                        
+                        setIsUploading(true);
+                        const url = await db.uploadFile(file);
+                        setIsUploading(false);
+                        
+                        if (url) {
+                            setAdminNote(prev => prev + `\n[ویس: ${url}]`);
+                            showNotification('ویس با موفقیت پیوست شد.', 'success');
+                        } else {
+                            showNotification('خطا در آپلود ویس.', 'error');
+                        }
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+                    
+                    recorder.start();
+                    mediaRecorderRef.current = recorder;
+                    setIsRecording(true);
+                } catch (err) {
+                    console.error(err);
+                    showNotification('عدم دسترسی به میکروفون.', 'error');
+                }
+            };
+
+            const stopRecording = () => {
+                if (mediaRecorderRef.current && isRecording) {
+                    mediaRecorderRef.current.stop();
+                    setIsRecording(false);
+                }
+            };
 
             return (
                 <div className={`p-4 rounded-lg border ${task.status === 'issue_reported' ? 'bg-red-900/20 border-red-500' : 'bg-slate-800 border-slate-700'}`}>
@@ -101,7 +175,7 @@ const EditorTaskManagement: React.FC = () => {
                     )}
 
                     <div className="flex flex-col gap-3 mt-4 border-t border-slate-700 pt-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 gap-3">
                             <div>
                                 <label className="block text-xs text-slate-400 mb-1">انتخاب تدوینگر</label>
                                 <select 
@@ -112,25 +186,45 @@ const EditorTaskManagement: React.FC = () => {
                                 >
                                     <option value="">انتخاب کنید...</option>
                                     {editors.map(ed => (
-                                        <option key={ed.user_id} value={ed.user_id}>{ed.full_name}</option>
+                                        <option key={ed.user_id} value={String(ed.user_id)}>{ed.full_name}</option>
                                     ))}
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-xs text-slate-400 mb-1">یادداشت مدیر (اختیاری)</label>
-                                <input 
-                                    type="text" 
-                                    value={adminNote} 
-                                    onChange={(e) => setAdminNote(e.target.value)}
-                                    placeholder="توضیحات برای تدوینگر..."
-                                    className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white"
-                                />
+                                <label className="block text-xs text-slate-400 mb-1">یادداشت مدیر (متن، فایل، ویس)</label>
+                                <div className="flex gap-2 mb-2">
+                                    <input 
+                                        type="text" 
+                                        value={adminNote} 
+                                        onChange={(e) => setAdminNote(e.target.value)}
+                                        placeholder="توضیحات برای تدوینگر..."
+                                        className="flex-1 bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white"
+                                    />
+                                    <button 
+                                        onClick={() => fileInputRef.current?.click()} 
+                                        disabled={isUploading}
+                                        className="p-2 bg-slate-700 rounded hover:bg-slate-600 text-slate-300" 
+                                        title="پیوست فایل"
+                                    >
+                                        <Icon name="paperclip" className="w-5 h-5"/>
+                                    </button>
+                                    <button 
+                                        onClick={isRecording ? stopRecording : startRecording}
+                                        disabled={isUploading} 
+                                        className={`p-2 rounded transition-colors ${isRecording ? 'bg-red-600 text-white animate-pulse' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+                                        title={isRecording ? 'توقف ضبط' : 'ضبط ویس'}
+                                    >
+                                        <Icon name={isRecording ? 'stop' : 'microphone'} className="w-5 h-5"/>
+                                    </button>
+                                    <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
+                                </div>
+                                {isUploading && <span className="text-xs text-violet-400 animate-pulse">در حال آپلود...</span>}
                             </div>
                         </div>
                         
                         <button 
                             onClick={() => handleAssign(task.id, taskEditorId, adminNote)}
-                            disabled={!taskEditorId}
+                            disabled={!taskEditorId || isUploading || isRecording}
                             className={`w-full py-2 rounded font-semibold transition-colors ${
                                 isAssigned 
                                 ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' 

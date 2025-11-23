@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, PostScenario, Report, EditorTask } from '../../types';
+import { User, PostScenario, Report, EditorTask, ActivityLog } from '../../types';
 import * as db from '../../services/dbService';
 import { Icon } from '../common/Icon';
 import { Loader } from '../common/Loader';
@@ -49,17 +49,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
     const [videoStats, setVideoStats] = useState<VideoStatsPerUser[]>([]);
     const [scenarioStats, setScenarioStats] = useState<ScenarioStat[]>([]);
     const [editorStats, setEditorStats] = useState<EditorStat[]>([]);
+    const [editorLogs, setEditorLogs] = useState<ActivityLog[]>([]);
 
     useEffect(() => {
         const fetchData = async () => {
             setIsLoading(true);
             try {
-                const [users, scenarios, reports, editorTasks, editors] = await Promise.all([
+                const [users, scenarios, reports, editorTasks, editors, editorActivity] = await Promise.all([
                     db.getAllUsers(),
                     db.getAllScenarios(),
                     db.getAllReports(),
                     db.getEditorTasks(),
-                    db.getAllEditors()
+                    db.getAllEditors(),
+                    db.getEditorActivityLogs()
                 ]);
 
                 const userMap = new Map(users.map(u => [u.user_id, u.full_name]));
@@ -134,6 +136,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
                     delivered: editorMap[ed.user_id]?.delivered || 0
                 }));
                 setEditorStats(editorStatsData);
+                
+                setEditorLogs(editorActivity);
 
             } catch (error) {
                 console.error("Failed to load dashboard data:", error);
@@ -181,31 +185,56 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
                 </button>
             </div>
             
-            {/* Editors Performance Section */}
-            <div className="bg-slate-800 p-6 rounded-xl">
-                <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                    <Icon name="chart-bar" className="w-6 h-6 text-violet-400"/>
-                    عملکرد تدوینگران
-                </h2>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-right text-sm text-slate-300">
-                        <thead className="text-slate-400 border-b border-slate-700">
-                            <tr>
-                                <th className="pb-3 font-medium">نام تدوینگر</th>
-                                <th className="pb-3 font-medium text-center">در حال انجام</th>
-                                <th className="pb-3 font-medium text-center">تحویل شده</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-700">
-                            {editorStats.map(ed => (
-                                <tr key={ed.id} className="hover:bg-slate-700/30">
-                                    <td className="py-3">{ed.name}</td>
-                                    <td className="py-3 text-center font-bold text-yellow-400">{ed.active}</td>
-                                    <td className="py-3 text-center font-bold text-green-400">{ed.delivered}</td>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Editors Performance Section */}
+                <div className="bg-slate-800 p-6 rounded-xl">
+                    <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                        <Icon name="chart-bar" className="w-6 h-6 text-violet-400"/>
+                        عملکرد تدوینگران
+                    </h2>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-right text-sm text-slate-300">
+                            <thead className="text-slate-400 border-b border-slate-700">
+                                <tr>
+                                    <th className="pb-3 font-medium">نام تدوینگر</th>
+                                    <th className="pb-3 font-medium text-center">در حال انجام</th>
+                                    <th className="pb-3 font-medium text-center">تحویل شده</th>
                                 </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-700">
+                                {editorStats.map(ed => (
+                                    <tr key={ed.id} className="hover:bg-slate-700/30">
+                                        <td className="py-3">{ed.name}</td>
+                                        <td className="py-3 text-center font-bold text-yellow-400">{ed.active}</td>
+                                        <td className="py-3 text-center font-bold text-green-400">{ed.delivered}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* Editor Activity Logs */}
+                <div className="bg-slate-800 p-6 rounded-xl max-h-[400px] overflow-y-auto">
+                    <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                        <Icon name="document-text" className="w-6 h-6 text-blue-400"/>
+                        آخرین فعالیت‌های تیم تدوین
+                    </h2>
+                    {editorLogs.length === 0 ? (
+                        <p className="text-slate-500 text-sm text-center py-4">فعالیتی ثبت نشده است.</p>
+                    ) : (
+                        <ul className="space-y-3">
+                            {editorLogs.map(log => (
+                                <li key={log.id} className="text-sm border-b border-slate-700 pb-2 last:border-0">
+                                    <div className="flex justify-between items-start mb-1">
+                                        <span className="font-bold text-slate-200">{log.user_full_name}</span>
+                                        <span className="text-xs text-slate-500">{new Date(log.timestamp).toLocaleDateString('fa-IR')}</span>
+                                    </div>
+                                    <p className="text-slate-400">{log.action}</p>
+                                </li>
                             ))}
-                        </tbody>
-                    </table>
+                        </ul>
+                    )}
                 </div>
             </div>
 

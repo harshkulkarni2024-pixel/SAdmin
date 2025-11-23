@@ -7,6 +7,14 @@ import { Icon } from '../common/Icon';
 import { Loader } from '../common/Loader';
 import { useNotification } from '../../contexts/NotificationContext';
 
+const formatTextForDisplay = (text: string): string => {
+    if (!text) return '';
+    const urlPattern = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+    return text
+        .replace(urlPattern, url => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-violet-400 hover:underline break-all">${url}</a>`)
+        .replace(/\n/g, '<br />');
+};
+
 const EditorView: React.FC = () => {
     const { user, logout } = useUser();
     const showNotification = useNotification();
@@ -34,9 +42,23 @@ const EditorView: React.FC = () => {
         fetchTasks();
     }, [fetchTasks]);
 
-    const handleStatusUpdate = async (taskId: number, status: EditorTask['status'], note?: string) => {
+    const handleStatusUpdate = async (taskId: number, status: EditorTask['status'], note?: string, scenarioNumber?: number) => {
+        if (!user) return;
         try {
             await db.updateEditorTaskStatus(taskId, status, note);
+            
+            // LOG THE ACTIVITY
+            let logMessage = '';
+            if (status === 'delivered') {
+                logMessage = `پروژه سناریو شماره ${scenarioNumber} را تحویل داد.`;
+            } else if (status === 'issue_reported') {
+                logMessage = `برای پروژه سناریو شماره ${scenarioNumber} گزارش مشکل ثبت کرد.`;
+            }
+            
+            if (logMessage) {
+                await db.logActivity(user.user_id, logMessage);
+            }
+
             showNotification(status === 'delivered' ? 'پروژه با موفقیت تحویل داده شد.' : 'گزارش مشکل ثبت شد.', 'success');
             fetchTasks();
             setIssueModalTask(null);
@@ -123,14 +145,14 @@ const EditorView: React.FC = () => {
                                     {task.admin_note && (
                                         <div className="bg-blue-900/20 border border-blue-800 p-3 rounded-lg mb-4">
                                             <p className="text-xs text-blue-300 font-bold mb-1">یادداشت مدیر:</p>
-                                            <p className="text-xs text-slate-300">{task.admin_note}</p>
+                                            <div className="text-xs text-slate-300 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: formatTextForDisplay(task.admin_note) }} />
                                         </div>
                                     )}
 
                                     {task.status !== 'delivered' && (
                                         <div className="flex gap-2 mt-4">
                                             <button 
-                                                onClick={() => handleStatusUpdate(task.id, 'delivered')}
+                                                onClick={() => handleStatusUpdate(task.id, 'delivered', undefined, task.scenario_number)}
                                                 className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-sm font-medium transition-colors flex justify-center items-center gap-1"
                                             >
                                                 <Icon name="check-circle" className="w-4 h-4"/>
@@ -176,7 +198,7 @@ const EditorView: React.FC = () => {
                                 انصراف
                             </button>
                             <button 
-                                onClick={() => handleStatusUpdate(issueModalTask.id, 'issue_reported', issueText)}
+                                onClick={() => handleStatusUpdate(issueModalTask.id, 'issue_reported', issueText, issueModalTask.scenario_number)}
                                 disabled={!issueText.trim()}
                                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg disabled:opacity-50"
                             >

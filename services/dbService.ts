@@ -1,5 +1,5 @@
 
-import type { User, PostScenario, Plan, Report, Caption, PostIdea, ActivityLog, ChatMessage, SubscriptionHistory, AlgorithmNews, CompetitorAnalysisHistory, EditorTask } from '../types';
+import type { User, PostScenario, Plan, Report, Caption, PostIdea, ActivityLog, ChatMessage, SubscriptionHistory, AlgorithmNews, CompetitorAnalysisHistory, EditorTask, ProductionEvent } from '../types';
 import { supabase, SUPABASE_INIT_ERROR } from './supabaseClient';
 
 // --- Constants ---
@@ -511,6 +511,50 @@ export const updateEditorTaskStatus = async (taskId: number, status: EditorTask[
     if (error) handleError(error, 'updateEditorTaskStatus');
 };
 
+export const uploadFile = async (file: File): Promise<string | null> => {
+    if (!supabase) return null;
+    const fileName = `${Date.now()}_${file.name}`;
+    const { data, error } = await supabase.storage
+        .from('attachments')
+        .upload(fileName, file);
+
+    if (error) {
+        handleError(error, 'uploadFile');
+        return null;
+    }
+
+    const { data: publicUrlData } = supabase.storage.from('attachments').getPublicUrl(fileName);
+    return publicUrlData.publicUrl;
+}
+
+// --- Production Calendar Events ---
+
+export const getProductionEvents = async (): Promise<ProductionEvent[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase
+        .from('production_events')
+        .select('*')
+        .order('start_time', { ascending: true });
+    
+    if (error) {
+        handleError(error, 'getProductionEvents');
+        return [];
+    }
+    return data || [];
+};
+
+export const addProductionEvent = async (event: Omit<ProductionEvent, 'id' | 'created_at'>): Promise<void> => {
+    if (!supabase) return;
+    const { error } = await supabase.from('production_events').insert(event);
+    if (error) handleError(error, 'addProductionEvent');
+};
+
+export const deleteProductionEvent = async (id: number): Promise<void> => {
+    if (!supabase) return;
+    const { error } = await supabase.from('production_events').delete().eq('id', id);
+    if (error) handleError(error, 'deleteProductionEvent');
+};
+
 
 // --- Ideas ---
 export const getIdeasForUser = async (userId: number): Promise<PostIdea[]> => {
@@ -547,7 +591,7 @@ export const addCaption = async (userId: number, title: string, content: string,
 // --- Activity Log ---
 export const logActivity = async (userId: number, action: string): Promise<void> => {
     if (!supabase) return;
-    if (isUserAdmin(userId)) return;
+    // Removed isUserAdmin check to allow editors/admins to log activities if needed
     const user = await getUserById(userId);
     if (user) {
         const logEntry = {
@@ -564,6 +608,26 @@ export const getActivityLogs = async (): Promise<ActivityLog[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('activity_logs').select('*').order('created_at', { ascending: false }).limit(100);
     if (error) handleError(error, 'getActivityLogs');
+    return data || [];
+};
+
+export const getEditorActivityLogs = async (): Promise<ActivityLog[]> => {
+    if (!supabase) return [];
+    // Join with users table to filter by role = 'editor'
+    const { data, error } = await supabase
+        .from('activity_logs')
+        .select(`
+            *,
+            user:users!inner(role)
+        `)
+        .eq('user.role', 'editor')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+    if (error) {
+        handleError(error, 'getEditorActivityLogs');
+        return [];
+    }
     return data || [];
 };
 

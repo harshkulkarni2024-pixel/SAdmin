@@ -153,6 +153,16 @@ export interface EditorTask {
   updated_at: string;
 }
 
+export interface ProductionEvent {
+  id: number;
+  project_name: string;
+  event_type: 'post' | 'story' | 'meeting' | 'off';
+  start_time: string;
+  end_time: string;
+  description?: string;
+  created_at: string;
+}
+
 export interface Plan {
   id: number;
   user_id: number;
