@@ -19,10 +19,10 @@ interface EventConfig {
 }
 
 const EVENT_TYPES: Record<EventType, EventConfig> = {
-    post: { label: 'ضبط پست', color: 'text-violet-300', bg: 'bg-gradient-to-r from-violet-900/80 to-fuchsia-900/80 border-violet-500', icon: 'video' },
-    story: { label: 'ضبط استوری', color: 'text-amber-300', bg: 'bg-gradient-to-r from-amber-900/80 to-orange-900/80 border-amber-500', icon: 'scenario' },
-    meeting: { label: 'جلسه', color: 'text-sky-300', bg: 'bg-gradient-to-r from-sky-900/80 to-blue-900/80 border-sky-500', icon: 'users' },
-    off: { label: 'آف / تعطیل', color: 'text-emerald-300', bg: 'bg-gradient-to-r from-emerald-900/80 to-teal-900/80 border-emerald-500', icon: 'coffee' },
+    post: { label: 'ضبط پست', color: 'text-violet-300', bg: 'bg-gradient-to-r from-violet-900/90 to-fuchsia-900/90 border-violet-500', icon: 'video' },
+    story: { label: 'ضبط استوری', color: 'text-amber-300', bg: 'bg-gradient-to-r from-amber-900/90 to-orange-900/90 border-amber-500', icon: 'scenario' },
+    meeting: { label: 'جلسه', color: 'text-sky-300', bg: 'bg-gradient-to-r from-sky-900/90 to-blue-900/90 border-sky-500', icon: 'users' },
+    off: { label: 'آف / تعطیل', color: 'text-emerald-100', bg: 'bg-emerald-600 border-emerald-400', icon: 'coffee' },
 };
 
 const ProductionCalendar: React.FC = () => {
@@ -101,8 +101,10 @@ const ProductionCalendar: React.FC = () => {
             const start = new Date(event.start_time);
             const end = new Date(event.end_time);
             
-            // Determine day of week (0-6) based on weekDates logic relative to startOfWeek isn't enough if event is in past
-            // But for UI selection, we map the event's actual date to 0-6 Saturday-Friday
+            // Find specific day index
+            const eventDateStr = start.toDateString();
+            // Default to 0 if something is off, but try to match with current week logic if possible, 
+            // or just map getDay() to our 0-6 (Sat-Fri) logic.
             const dayIndex = (start.getDay() + 1) % 7;
             
             setDayOfWeek(dayIndex);
@@ -111,7 +113,6 @@ const ProductionCalendar: React.FC = () => {
             setEventType(event.event_type as EventType);
             setDescription(event.description || '');
             
-            // Find user by project name matching full_name (simple heuristic)
             if (event.event_type !== 'off') {
                 const user = users.find(u => u.full_name === event.project_name);
                 setSelectedUser(user ? String(user.user_id) : '');
@@ -138,7 +139,7 @@ const ProductionCalendar: React.FC = () => {
 
         const projectTitle = eventType === 'off' ? 'آف / تعطیل' : (users.find(u => String(u.user_id) === selectedUser)?.full_name || 'نامشخص');
 
-        // Construct Date objects
+        // Construct Date objects based on selected day of CURRENT VIEWED week
         const targetDate = new Date(weekDates[dayOfWeek]);
         
         const [startH, startM] = startTime.split(':').map(Number);
@@ -185,7 +186,7 @@ const ProductionCalendar: React.FC = () => {
                 await db.deleteProductionEvent(id);
                 const refreshedEvents = await db.getProductionEvents();
                 setEvents(refreshedEvents);
-                setIsModalOpen(false); // Close modal if open
+                setIsModalOpen(false);
                 showNotification('رویداد حذف شد.', 'success');
             } catch(e) {
                 showNotification('خطا در حذف رویداد.', 'error');
@@ -193,7 +194,6 @@ const ProductionCalendar: React.FC = () => {
         }
     };
 
-    // Helper to position events
     const getEventStyle = (event: ProductionEvent) => {
         const start = new Date(event.start_time);
         const end = new Date(event.end_time);
@@ -201,9 +201,8 @@ const ProductionCalendar: React.FC = () => {
         const startHour = start.getHours() + start.getMinutes() / 60;
         const endHour = end.getHours() + end.getMinutes() / 60;
         
-        // Calendar starts at 8 AM
+        // 1 Hour = 60px
         const topOffset = (startHour - 8) * 60; 
-        // Precise height based on duration
         const height = (endHour - startHour) * 60;
 
         return {
@@ -223,31 +222,29 @@ const ProductionCalendar: React.FC = () => {
 
     return (
         <div className="h-full flex flex-col animate-fade-in bg-slate-900 text-slate-100">
-            {/* Minimal Header */}
-            <div className="flex justify-between items-center mb-4 px-4 py-3 bg-slate-800/50 backdrop-blur-md rounded-xl border border-slate-700 shadow-sm">
+            {/* Header */}
+            <div className="flex justify-between items-center mb-4 px-1">
                 <div className="flex items-center gap-3">
-                    <div className="bg-violet-600/20 p-1.5 rounded-lg">
-                        <Icon name="calendar" className="w-5 h-5 text-violet-400" />
-                    </div>
-                    <h1 className="text-lg font-bold text-white">تقویم ضبط</h1>
+                    <h1 className="text-2xl font-bold text-white">تقویم ضبط</h1>
                 </div>
                 
-                <div className="flex items-center gap-3">
-                    <div className="flex items-center bg-slate-800 rounded-lg border border-slate-700/50">
-                        <button onClick={handlePrevWeek} className="p-1.5 hover:bg-slate-700 rounded-md transition-colors"><Icon name="back" className="w-4 h-4 rotate-180 text-slate-400" /></button>
-                        <span className="px-3 font-mono text-xs text-slate-300 min-w-[130px] text-center">
-                            {weekDates[0].toLocaleDateString('fa-IR')} - {weekDates[6].toLocaleDateString('fa-IR')}
-                        </span>
-                        <button onClick={handleNextWeek} className="p-1.5 hover:bg-slate-700 rounded-md transition-colors"><Icon name="back" className="w-4 h-4 text-slate-400" /></button>
-                    </div>
-                    <button onClick={handleToday} className="px-3 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors text-slate-300">امروز</button>
+                <div className="flex items-center gap-3 bg-slate-800 p-1 rounded-lg border border-slate-700">
                     <button 
                         onClick={() => openModal()}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-lg transition-colors"
+                        className="flex items-center justify-center w-8 h-8 bg-violet-600 hover:bg-violet-700 text-white rounded-md transition-colors"
+                        title="ثبت رویداد جدید"
                     >
-                        <Icon name="plus" className="w-4 h-4" />
-                        <span>جدید</span>
+                        <Icon name="plus" className="w-5 h-5" />
                     </button>
+                    <div className="h-6 w-px bg-slate-600 mx-1"></div>
+                    <button onClick={handleToday} className="px-3 text-xs font-medium text-slate-300 hover:text-white transition-colors">امروز</button>
+                    <div className="flex items-center gap-1">
+                        <button onClick={handlePrevWeek} className="p-1 hover:text-white text-slate-400"><Icon name="back" className="w-4 h-4 rotate-180" /></button>
+                        <span className="text-xs font-mono text-slate-300 min-w-[140px] text-center">
+                            {weekDates[0].toLocaleDateString('fa-IR')} - {weekDates[6].toLocaleDateString('fa-IR')}
+                        </span>
+                        <button onClick={handleNextWeek} className="p-1 hover:text-white text-slate-400"><Icon name="back" className="w-4 h-4" /></button>
+                    </div>
                 </div>
             </div>
 
@@ -262,9 +259,9 @@ const ProductionCalendar: React.FC = () => {
                         {weekDates.map((date, i) => {
                             const isToday = new Date().toDateString() === date.toDateString();
                             return (
-                                <div key={i} className={`py-2 text-center border-l border-slate-700 ${isToday ? 'bg-violet-900/20' : ''}`}>
-                                    <p className={`text-xs font-bold ${isToday ? 'text-violet-400' : 'text-slate-400'}`}>{WEEK_DAYS[i]}</p>
-                                    <p className={`text-[10px] mt-0.5 ${isToday ? 'text-violet-300' : 'text-slate-500'}`}>{date.toLocaleDateString('fa-IR')}</p>
+                                <div key={i} className="py-3 text-center border-l border-slate-700 bg-slate-800/50">
+                                    <p className={`text-sm font-bold ${isToday ? 'text-violet-400' : 'text-slate-300'}`}>{WEEK_DAYS[i]}</p>
+                                    <p className="text-[10px] text-slate-500 mt-1 font-mono">{date.toLocaleDateString('fa-IR')}</p>
                                 </div>
                             )
                         })}
@@ -297,17 +294,17 @@ const ProductionCalendar: React.FC = () => {
                                     return (
                                         <div
                                             key={event.id}
-                                            className={`absolute inset-x-1 rounded p-1.5 border overflow-hidden group cursor-pointer transition-all hover:z-10 hover:scale-[1.02] shadow-md ${config.bg}`}
+                                            className={`absolute inset-x-1 rounded-md p-2 border overflow-hidden group cursor-pointer transition-all hover:z-10 hover:shadow-lg shadow-md ${config.bg}`}
                                             style={style}
                                             onClick={() => openModal(event)}
                                         >
-                                            <div className="flex items-center gap-1 mb-0.5">
-                                                <Icon name={config.icon} className={`w-3 h-3 ${config.color}`} />
+                                            <div className="flex items-center gap-1.5 mb-1">
+                                                <Icon name={config.icon} className={`w-3.5 h-3.5 ${config.color}`} />
                                                 <span className={`text-[10px] font-bold truncate ${config.color}`}>{config.label}</span>
                                             </div>
-                                            <p className="text-xs text-white font-semibold truncate leading-tight">{event.project_name}</p>
+                                            <p className="text-xs text-white font-bold truncate leading-tight">{event.project_name}</p>
                                             {event.description && (
-                                                <p className="text-[9px] text-white/70 truncate mt-0.5">{event.description}</p>
+                                                <p className="text-[10px] text-white/80 truncate mt-1">{event.description}</p>
                                             )}
                                         </div>
                                     );
@@ -321,18 +318,17 @@ const ProductionCalendar: React.FC = () => {
             {/* Add/Edit Event Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setIsModalOpen(false)}>
-                    <div className="bg-slate-800 border border-slate-600 w-full max-w-sm rounded-xl shadow-2xl overflow-hidden animate-fade-in" onClick={e => e.stopPropagation()}>
-                        <div className="px-5 py-4 border-b border-slate-700 flex justify-between items-center bg-slate-900/50">
-                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                                {editingEventId ? <Icon name="edit" className="w-5 h-5 text-violet-400"/> : <Icon name="plus" className="w-5 h-5 text-violet-400"/>}
-                                {editingEventId ? 'ویرایش رویداد' : 'رویداد جدید'}
+                    <div className="bg-slate-800 border border-slate-700 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-fade-in" onClick={e => e.stopPropagation()}>
+                        <div className="px-6 py-4 border-b border-slate-700 flex justify-between items-center bg-slate-900/50">
+                            <h2 className="text-lg font-bold text-white">
+                                {editingEventId ? 'ویرایش برنامه' : 'برنامه جدید'}
                             </h2>
-                            <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white"><Icon name="x-circle" className="w-5 h-5" /></button>
+                            <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white"><Icon name="x-circle" className="w-6 h-6" /></button>
                         </div>
                         
-                        <div className="p-5 space-y-4">
-                            {/* Minimal Event Type Selector */}
-                            <div className="flex bg-slate-900 rounded-lg p-1 gap-1 overflow-x-auto">
+                        <div className="p-6 space-y-5">
+                            {/* Event Type Selector - Minimal Cards */}
+                            <div className="grid grid-cols-4 gap-2">
                                 {(Object.entries(EVENT_TYPES) as [EventType, EventConfig][]).map(([type, config]) => (
                                     <button
                                         key={type}
@@ -340,14 +336,14 @@ const ProductionCalendar: React.FC = () => {
                                             setEventType(type);
                                             if (type === 'off') setSelectedUser('');
                                         }}
-                                        className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-1 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                                        className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all border-2 ${
                                             eventType === type 
-                                            ? `${config.bg.split(' ')[0]} text-white shadow-sm` 
-                                            : 'text-slate-400 hover:bg-slate-800'
+                                            ? `border-violet-500 bg-violet-500/20 text-white` 
+                                            : 'border-transparent bg-slate-700/50 text-slate-400 hover:bg-slate-700'
                                         }`}
                                     >
-                                        <Icon name={config.icon} className="w-3.5 h-3.5" />
-                                        <span>{config.label}</span>
+                                        <Icon name={config.icon} className={`w-5 h-5 mb-1 ${eventType === type ? config.color : ''}`} />
+                                        <span className="text-[10px] font-bold">{config.label}</span>
                                     </button>
                                 ))}
                             </div>
@@ -355,58 +351,66 @@ const ProductionCalendar: React.FC = () => {
                             {/* Project/User Selection */}
                             {eventType !== 'off' && (
                                 <div>
-                                    <label className="block text-xs text-slate-400 mb-1.5">انتخاب پروژه (کاربر)</label>
+                                    <label className="block text-xs font-medium text-slate-400 mb-2">انتخاب پروژه (کاربر)</label>
                                     <div className="relative">
                                         <select 
                                             value={selectedUser} 
                                             onChange={(e) => setSelectedUser(e.target.value)}
-                                            className="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-sm text-white focus:border-violet-500 outline-none appearance-none"
+                                            className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 pl-10 text-sm text-white focus:border-violet-500 outline-none appearance-none transition-colors"
                                         >
                                             <option value="">انتخاب کنید...</option>
                                             {users.map(u => (
                                                 <option key={u.user_id} value={u.user_id}>{u.full_name}</option>
                                             ))}
                                         </select>
-                                        <div className="absolute left-3 top-3 pointer-events-none text-slate-500">
+                                        <div className="absolute left-3 top-3.5 pointer-events-none text-slate-500">
                                             <Icon name="users" className="w-4 h-4" />
                                         </div>
                                     </div>
                                 </div>
                             )}
 
-                            {/* Date & Time */}
-                            <div className="grid grid-cols-3 gap-2">
-                                <div className="col-span-3 md:col-span-1">
-                                    <label className="block text-xs text-slate-400 mb-1.5">روز هفته</label>
-                                    <select 
-                                        value={dayOfWeek}
-                                        onChange={(e) => setDayOfWeek(Number(e.target.value))}
-                                        className="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-sm text-white outline-none focus:border-violet-500"
-                                    >
-                                        {WEEK_DAYS.map((day, i) => (
-                                            <option key={i} value={i}>{day}</option>
-                                        ))}
-                                    </select>
+                            {/* Day Selection - Minimal Horizontal List */}
+                            <div>
+                                <label className="block text-xs font-medium text-slate-400 mb-2">روز هفته</label>
+                                <div className="flex justify-between bg-slate-900 p-1 rounded-xl">
+                                    {WEEK_DAYS.map((day, i) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => setDayOfWeek(i)}
+                                            className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${
+                                                dayOfWeek === i 
+                                                ? 'bg-violet-600 text-white shadow-md' 
+                                                : 'text-slate-400 hover:text-white'
+                                            }`}
+                                        >
+                                            {day.split(' ')[0]}
+                                        </button>
+                                    ))}
                                 </div>
-                                <div>
-                                    <label className="block text-xs text-slate-400 mb-1.5">ساعت شروع</label>
-                                    <div className="relative">
+                            </div>
+
+                            {/* Time Inputs */}
+                            <div className="flex gap-4">
+                                <div className="flex-1">
+                                    <label className="block text-xs font-medium text-slate-400 mb-2">شروع</label>
+                                    <div className="relative bg-slate-900 rounded-xl border border-slate-600 focus-within:border-violet-500 transition-colors p-1">
                                         <input 
                                             type="time" 
                                             value={startTime}
                                             onChange={(e) => setStartTime(e.target.value)}
-                                            className="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-sm text-center text-white outline-none focus:border-violet-500"
+                                            className="w-full bg-transparent p-2 text-center text-white outline-none font-mono text-lg"
                                         />
                                     </div>
                                 </div>
-                                <div>
-                                    <label className="block text-xs text-slate-400 mb-1.5">ساعت پایان</label>
-                                    <div className="relative">
+                                <div className="flex-1">
+                                    <label className="block text-xs font-medium text-slate-400 mb-2">پایان</label>
+                                    <div className="relative bg-slate-900 rounded-xl border border-slate-600 focus-within:border-violet-500 transition-colors p-1">
                                         <input 
                                             type="time" 
                                             value={endTime}
                                             onChange={(e) => setEndTime(e.target.value)}
-                                            className="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-sm text-center text-white outline-none focus:border-violet-500"
+                                            className="w-full bg-transparent p-2 text-center text-white outline-none font-mono text-lg"
                                         />
                                     </div>
                                 </div>
@@ -414,41 +418,32 @@ const ProductionCalendar: React.FC = () => {
 
                             {/* Description */}
                             <div>
-                                <label className="block text-xs text-slate-400 mb-1.5">یادداشت (اختیاری)</label>
+                                <label className="block text-xs font-medium text-slate-400 mb-2">یادداشت (اختیاری)</label>
                                 <input 
                                     type="text" 
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
                                     placeholder="مثلاً: لوکیشن استودیو"
-                                    className="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-sm text-white outline-none focus:border-violet-500"
+                                    className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-sm text-white outline-none focus:border-violet-500 transition-colors"
                                 />
                             </div>
 
-                            <div className="flex gap-2 pt-2">
+                            <div className="flex gap-3 pt-2">
                                 {editingEventId && (
                                     <button 
                                         onClick={() => handleDeleteEvent(editingEventId)}
-                                        className="bg-red-900/50 border border-red-700 text-red-200 hover:bg-red-900/80 p-2.5 rounded-lg transition-colors"
-                                        title="حذف رویداد"
+                                        className="bg-red-500/10 border border-red-500/50 text-red-400 hover:bg-red-500 hover:text-white w-12 rounded-xl flex items-center justify-center transition-all"
+                                        title="حذف"
                                     >
                                         <Icon name="trash" className="w-5 h-5" />
                                     </button>
                                 )}
                                 <button 
                                     onClick={handleSaveEvent}
-                                    className="flex-1 bg-violet-600 hover:bg-violet-700 text-white font-bold py-2.5 rounded-lg shadow-lg shadow-violet-900/30 transition-transform active:scale-95 flex justify-center items-center gap-2"
+                                    className="flex-1 bg-white text-slate-900 hover:bg-violet-50 font-bold py-3 rounded-xl shadow-lg shadow-white/10 transition-transform active:scale-95 flex justify-center items-center gap-2"
                                 >
-                                    {editingEventId ? (
-                                        <>
-                                            <Icon name="refresh" className="w-5 h-5"/>
-                                            بروزرسانی
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Icon name="save" className="w-5 h-5"/>
-                                            ثبت
-                                        </>
-                                    )}
+                                    {editingEventId ? <Icon name="refresh" className="w-5 h-5"/> : <Icon name="save" className="w-5 h-5"/>}
+                                    {editingEventId ? 'بروزرسانی' : 'ثبت رویداد'}
                                 </button>
                             </div>
                         </div>

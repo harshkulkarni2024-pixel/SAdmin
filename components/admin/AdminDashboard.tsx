@@ -163,24 +163,34 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
                 <p className="text-slate-400 mt-1">آمار کلی و وضعیت کاربران در یک نگاه.</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <button onClick={() => onNavigate('editor_tasks')} className="w-full bg-violet-600 p-4 rounded-xl flex items-center text-right group hover:bg-violet-700 transition-all duration-300 transform hover:-translate-y-1">
-                    <div className="bg-white/10 p-3 rounded-full me-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <button onClick={() => onNavigate('editor_tasks')} className="bg-violet-600 p-4 rounded-xl flex items-center text-right group hover:bg-violet-700 transition-all duration-300 transform hover:-translate-y-1 shadow-lg shadow-violet-900/20">
+                    <div className="bg-white/20 p-3 rounded-full me-4">
                         <Icon name="video" className="w-8 h-8 text-white" />
                     </div>
                     <div>
-                        <h3 className="text-xl font-bold text-white">مدیریت تدوین</h3>
-                        <p className="text-sm text-violet-200">تخصیص و پیگیری پروژه‌های تدوین</p>
+                        <h3 className="text-lg font-bold text-white">مدیریت تدوین</h3>
+                        <p className="text-xs text-violet-200">پروژه‌ها و تدوینگران</p>
                     </div>
                 </button>
 
-                <button onClick={() => onNavigate('users')} className="w-full bg-slate-700 p-4 rounded-xl flex items-center text-right group hover:bg-slate-600 transition-all duration-300 transform hover:-translate-y-1">
+                <button onClick={() => onNavigate('production_calendar')} className="bg-indigo-600 p-4 rounded-xl flex items-center text-right group hover:bg-indigo-700 transition-all duration-300 transform hover:-translate-y-1 shadow-lg shadow-indigo-900/20">
+                    <div className="bg-white/20 p-3 rounded-full me-4">
+                        <Icon name="calendar" className="w-8 h-8 text-white" />
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-white">تقویم ضبط</h3>
+                        <p className="text-xs text-indigo-200">برنامه‌ریزی تولید</p>
+                    </div>
+                </button>
+
+                <button onClick={() => onNavigate('users')} className="bg-slate-700 p-4 rounded-xl flex items-center text-right group hover:bg-slate-600 transition-all duration-300 transform hover:-translate-y-1 shadow-lg shadow-slate-900/20">
                     <div className="bg-white/10 p-3 rounded-full me-4">
                         <Icon name="users" className="w-8 h-8 text-white" />
                     </div>
                     <div>
-                        <h3 className="text-xl font-bold text-white">مدیریت کاربران</h3>
-                        <p className="text-sm text-slate-300">مشاهده و ویرایش اطلاعات کاربران</p>
+                        <h3 className="text-lg font-bold text-white">مدیریت کاربران</h3>
+                        <p className="text-xs text-slate-300">لیست و اطلاعات اعضا</p>
                     </div>
                 </button>
             </div>

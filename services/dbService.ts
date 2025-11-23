@@ -543,6 +543,22 @@ export const getProductionEvents = async (): Promise<ProductionEvent[]> => {
     return data || [];
 };
 
+export const getProductionEventsForUser = async (userName: string): Promise<ProductionEvent[]> => {
+    if (!supabase) return [];
+    // Note: In a real app, linking by ID is better, but current schema uses name string
+    const { data, error } = await supabase
+        .from('production_events')
+        .select('*')
+        .eq('project_name', userName)
+        .order('start_time', { ascending: true });
+    
+    if (error) {
+        handleError(error, 'getProductionEventsForUser');
+        return [];
+    }
+    return data || [];
+};
+
 export const addProductionEvent = async (event: Omit<ProductionEvent, 'id' | 'created_at'>): Promise<void> => {
     if (!supabase) return;
     const { error } = await supabase.from('production_events').insert(event);

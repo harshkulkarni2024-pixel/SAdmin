@@ -177,18 +177,26 @@ const EditorTaskManagement: React.FC = () => {
                     <div className="flex flex-col gap-3 mt-4 border-t border-slate-700 pt-4">
                         <div className="grid grid-cols-1 gap-3">
                             <div>
-                                <label className="block text-xs text-slate-400 mb-1">انتخاب تدوینگر</label>
-                                <select 
-                                    value={taskEditorId} 
-                                    onChange={(e) => setTaskEditorId(e.target.value)}
-                                    className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white"
-                                    disabled={isAssigned && task.status !== 'issue_reported'}
-                                >
-                                    <option value="">انتخاب کنید...</option>
-                                    {editors.map(ed => (
-                                        <option key={ed.user_id} value={String(ed.user_id)}>{ed.full_name}</option>
-                                    ))}
-                                </select>
+                                <label className="block text-xs text-slate-400 mb-2">انتخاب تدوینگر</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {editors.map(ed => {
+                                        const isSelected = taskEditorId === String(ed.user_id);
+                                        return (
+                                            <button
+                                                key={ed.user_id}
+                                                onClick={() => setTaskEditorId(String(ed.user_id))}
+                                                disabled={isAssigned && task.status !== 'issue_reported'}
+                                                className={`px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
+                                                    isSelected
+                                                    ? 'bg-violet-600 border-violet-500 text-white shadow-md transform scale-105'
+                                                    : 'bg-slate-900 border-slate-600 text-slate-400 hover:border-slate-500 hover:text-slate-300'
+                                                } ${isAssigned && task.status !== 'issue_reported' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                            >
+                                                {ed.full_name}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-xs text-slate-400 mb-1">یادداشت مدیر (متن، فایل، ویس)</label>
@@ -511,7 +519,7 @@ const EditorTaskManagement: React.FC = () => {
         <div className="animate-fade-in max-w-6xl mx-auto">
             {viewMode !== 'profile' && (
                 <>
-                    <h1 className="text-3xl font-bold text-white mb-6">مدیریت استودیوی تدوین</h1>
+                    <h1 className="text-3xl font-bold text-white mb-6">مدیریت تدوین</h1>
                     <div className="flex border-b border-slate-700 mb-6">
                         <button 
                             onClick={() => setViewMode('kanban')}
