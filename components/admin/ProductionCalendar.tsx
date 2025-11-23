@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ProductionEvent, User } from '../../types';
 import * as db from '../../services/dbService';
 import { Icon } from '../common/Icon';
@@ -101,10 +101,6 @@ const ProductionCalendar: React.FC = () => {
             const start = new Date(event.start_time);
             const end = new Date(event.end_time);
             
-            // Find specific day index
-            const eventDateStr = start.toDateString();
-            // Default to 0 if something is off, but try to match with current week logic if possible, 
-            // or just map getDay() to our 0-6 (Sat-Fri) logic.
             const dayIndex = (start.getDay() + 1) % 7;
             
             setDayOfWeek(dayIndex);
@@ -223,12 +219,10 @@ const ProductionCalendar: React.FC = () => {
     return (
         <div className="h-full flex flex-col animate-fade-in bg-slate-900 text-slate-100">
             {/* Header */}
-            <div className="flex justify-between items-center mb-4 px-1">
-                <div className="flex items-center gap-3">
-                    <h1 className="text-2xl font-bold text-white">تقویم ضبط</h1>
-                </div>
+            <div className="flex items-center justify-between px-2 py-3 border-b border-slate-800 mb-2">
+                <h1 className="text-xl font-bold text-white whitespace-nowrap">تقویم ضبط</h1>
                 
-                <div className="flex items-center gap-3 bg-slate-800 p-1 rounded-lg border border-slate-700">
+                <div className="flex items-center gap-2 bg-slate-800 p-1 rounded-lg">
                     <button 
                         onClick={() => openModal()}
                         className="flex items-center justify-center w-8 h-8 bg-violet-600 hover:bg-violet-700 text-white rounded-md transition-colors"
@@ -236,11 +230,15 @@ const ProductionCalendar: React.FC = () => {
                     >
                         <Icon name="plus" className="w-5 h-5" />
                     </button>
-                    <div className="h-6 w-px bg-slate-600 mx-1"></div>
-                    <button onClick={handleToday} className="px-3 text-xs font-medium text-slate-300 hover:text-white transition-colors">امروز</button>
-                    <div className="flex items-center gap-1">
+                    <div className="h-5 w-px bg-slate-600 mx-1"></div>
+                    
+                    <button onClick={handleToday} className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-700 rounded-md transition-colors" title="امروز">
+                        <Icon name="refresh" className="w-5 h-5" />
+                    </button>
+                    
+                    <div className="flex items-center bg-slate-900 rounded-md px-1">
                         <button onClick={handlePrevWeek} className="p-1 hover:text-white text-slate-400"><Icon name="back" className="w-4 h-4 rotate-180" /></button>
-                        <span className="text-xs font-mono text-slate-300 min-w-[140px] text-center">
+                        <span className="text-xs font-mono text-slate-300 min-w-[130px] text-center py-1">
                             {weekDates[0].toLocaleDateString('fa-IR')} - {weekDates[6].toLocaleDateString('fa-IR')}
                         </span>
                         <button onClick={handleNextWeek} className="p-1 hover:text-white text-slate-400"><Icon name="back" className="w-4 h-4" /></button>
@@ -254,7 +252,7 @@ const ProductionCalendar: React.FC = () => {
                 
                 <div className="min-w-[800px]">
                     {/* Header Row (Days) */}
-                    <div className="grid grid-cols-[50px_repeat(7,1fr)] border-b border-slate-700 sticky top-0 bg-slate-900 z-10">
+                    <div className="grid grid-cols-[50px_repeat(7,1fr)] border-b border-slate-700 sticky top-0 bg-slate-900 z-10 shadow-sm">
                         <div className="border-l border-slate-700"></div>
                         {weekDates.map((date, i) => {
                             const isToday = new Date().toDateString() === date.toDateString();
