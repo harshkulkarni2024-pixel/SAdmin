@@ -1,3 +1,4 @@
+
 // Environment variables are accessed via `process.env`.
 // These type definitions ensure TypeScript recognizes them in a browser-like environment.
 // Fix: Use namespace merging to augment the existing process.env type
@@ -106,17 +107,17 @@ export interface User {
   full_name: string;
   access_code: string;
   is_verified: boolean;
+  role?: 'user' | 'admin' | 'editor'; // Added role
   about_info?: string;
-  preferred_name?: string; // New field for chat greeting
-  story_requests: number;        // Daily limit
-  caption_idea_requests?: number; // Daily limit
-  chat_messages: number;         // Weekly limit
-  last_request_date: string;     // For daily story reset
-  last_weekly_reset_date?: string; // For weekly chat/image resets
+  preferred_name?: string; 
+  story_requests: number;        
+  caption_idea_requests?: number; 
+  chat_messages: number;         
+  last_request_date: string;     
+  last_weekly_reset_date?: string; 
   is_vip?: boolean;
-  subscription_expires_at?: string; // New field for subscription
-  is_subscription_expired?: boolean; // New flag for expired users
-  // Customizable limits
+  subscription_expires_at?: string; 
+  is_subscription_expired?: boolean; 
   story_limit?: number;
   caption_idea_limit?: number;
   chat_limit?: number;
@@ -135,6 +136,31 @@ export interface PostScenario {
   user_id: number;
   scenario_number: number;
   content: string;
+}
+
+export interface EditorTask {
+  id: number;
+  client_user_id: number;
+  client_name?: string; // Joined field
+  scenario_content: string;
+  scenario_number: number;
+  assigned_editor_id: number | null;
+  editor_name?: string; // Joined field
+  status: 'pending_assignment' | 'assigned' | 'delivered' | 'issue_reported';
+  admin_note: string | null;
+  editor_note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductionEvent {
+  id: number;
+  project_name: string;
+  event_type: 'post' | 'story' | 'meeting' | 'off';
+  start_time: string;
+  end_time: string;
+  description?: string;
+  created_at: string;
 }
 
 export interface Plan {
@@ -169,7 +195,7 @@ export interface ChatMessage {
     sender: 'user' | 'ai';
     text: string;
     imageUrl?: string;
-    isInterim?: boolean; // For transient UI states, like streaming AI response
+    isInterim?: boolean; 
 }
 
 export interface ActivityLog {
@@ -205,7 +231,7 @@ export interface CompetitorAnalysisHistory {
     visual_analysis: string;
     web_analysis: string;
 }
-// Fix: Add the missing BoxApiProfile type for the Instagram profile API service.
+
 export interface BoxApiProfile {
   username: string;
   full_name: string;

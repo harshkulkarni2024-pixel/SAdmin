@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { User } from './types';
 import { verifyAccessCode, isUserAdmin, getUserById } from './services/dbService';
 import WelcomeScreen from './components/auth/WelcomeScreen';
 import AdminView from './components/admin/AdminView';
 import UserView from './components/user/UserView';
+import EditorView from './components/editor/EditorView';
 import { Loader } from './components/common/Loader';
 import { Icon } from './components/common/Icon';
 import { UserProvider } from './contexts/UserContext';
@@ -87,7 +89,7 @@ const App: React.FC = () => {
                   setError('اشتراک شما به پایان رسیده است. برای تمدید، با پشتیبانی در تلگرام در ارتباط باشید.');
               } else {
                   setCurrentUser(user);
-                  setIsAdmin(isUserAdmin(user.user_id));
+                  setIsAdmin(user.role === 'admin');
               }
             } else {
               localStorage.removeItem('userId');
@@ -120,8 +122,7 @@ const App: React.FC = () => {
           return false;
         }
         setCurrentUser(user);
-        const adminStatus = isUserAdmin(user.user_id);
-        setIsAdmin(adminStatus);
+        setIsAdmin(user.role === 'admin');
         localStorage.setItem('userId', String(user.user_id));
         return true;
       } else {
@@ -188,8 +189,10 @@ const App: React.FC = () => {
         <div className="min-h-screen bg-slate-900 text-slate-100">
           {!currentUser ? (
             <WelcomeScreen onLogin={handleLogin} error={error} setError={setError} showExpiredLink={showExpiredSubscriptionMessage} />
-          ) : isAdmin ? (
+          ) : currentUser.role === 'admin' ? (
             <AdminView />
+          ) : currentUser.role === 'editor' ? (
+            <EditorView />
           ) : (
             <UserView />
           )}

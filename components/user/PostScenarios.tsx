@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { PostScenario } from '../../types';
 import * as db from '../../services/dbService';
@@ -59,31 +60,42 @@ const PostScenarios: React.FC<PostScenariosProps> = ({ setActiveView }) => {
     const handleRecord = async (scenarioId: number) => {
         if (!user) return;
         setIsLoading(true);
-        showNotification('عالی! در حال تولید کپشن برای شما...', 'info');
+        showNotification('در حال پردازش...', 'info');
         const scenarioToProcess = await db.getScenarioById(scenarioId);
         if (scenarioToProcess) {
             try {
-                const captionContent = await generateCaption(user.about_info || '', scenarioToProcess.content);
-                
-                if (captionContent && captionContent.includes(AI_INIT_ERROR)) {
-                    throw new Error(AI_INIT_ERROR);
+                // 1. Try Generate Caption (Non-blocking)
+                try {
+                    const captionContent = await generateCaption(user.about_info || '', scenarioToProcess.content);
+                    
+                    if (captionContent && captionContent.includes(AI_INIT_ERROR)) {
+                         console.warn("AI Init Error detected in caption generation");
+                         // We don't throw here to allow the process to continue to editor task creation
+                    } else if (captionContent && captionContent.trim()) {
+                        const captionTitle = `کپشن سناریو شماره ${scenarioToProcess.scenario_number}`;
+                        await db.addCaption(user.user_id, captionTitle, captionContent, scenarioToProcess.content);
+                        showNotification('کپشن با موفقیت تولید شد.', 'success');
+                    }
+                } catch (aiError) {
+                    console.error("Caption generation failed:", aiError);
+                    showNotification('تولید کپشن با خطا مواجه شد، اما سناریو برای تدوین ارسال می‌شود.', 'info');
                 }
+
+                // 2. Create Editor Task (Always happens)
+                await db.createEditorTask(user.user_id, scenarioToProcess.content, scenarioToProcess.scenario_number);
+
+                await db.logActivity(user.user_id, `سناریو شماره ${scenarioToProcess.scenario_number} را تایید و برای تدوین ارسال کرد.`);
                 
-                if (captionContent && captionContent.trim()) {
-                    const captionTitle = `کپشن سناریو شماره ${scenarioToProcess.scenario_number}`;
-                    await db.addCaption(user.user_id, captionTitle, captionContent, scenarioToProcess.content);
-                    await db.logActivity(user.user_id, `سناریو شماره ${scenarioToProcess.scenario_number} را تایید کرد.`);
-                    showNotification(`آفرین! کپشن برای سناریو شماره ${scenarioToProcess.scenario_number} تولید شد و در بخش «کپشن‌ها» ذخیره شد.`, 'success');
-                } else {
-                     throw new Error("پاسخ خالی از هوش مصنوعی دریافت شد.");
-                }
+                // 3. Delete the original scenario from user's list
+                await db.deleteScenario(scenarioId);
+                
+                showNotification(`ویدیو با موفقیت برای تدوینگر ارسال شد.`, 'success');
 
             } catch (err) {
                 const errorMessage = (err as Error).message;
-                console.error("Caption Generation Error:", errorMessage);
-                showNotification(`خطا در تولید کپشن: ${errorMessage}`, 'error');
+                console.error("Processing Error:", errorMessage);
+                showNotification(`خطا در پردازش: ${errorMessage}`, 'error');
             } finally {
-                await db.deleteScenario(scenarioId);
                 refreshScenarios();
                 setSelectedScenario(null);
                 setIsLoading(false);
@@ -137,7 +149,7 @@ const PostScenarios: React.FC<PostScenariosProps> = ({ setActiveView }) => {
                             disabled={isLoading}
                             className="w-full flex justify-center items-center bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 disabled:bg-slate-600 transition-colors"
                         >
-                            {isLoading ? <Loader /> : '✅ این ویدیو را ضبط کردم!'}
+                            {isLoading ? <Loader /> : '✅ این ویدیو را ضبط کردم! (ارسال برای تدوین)'}
                         </button>
                     </div>
                 </div>
