@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 
-type IconName = 'user' | 'users' | 'logout' | 'dashboard' | 'chat' | 'scenario' | 'caption' | 'image' | 'plan' | 'report' | 'idea' | 'broadcast' | 'back' | 'trash' | 'edit' | 'send' | 'microphone' | 'stop' | 'plus' | 'key' | 'lock-closed' | 'menu' | 'document-text' | 'chart-bar' | 'upload' | 'phone-wave' | 'crown' | 'paperclip' | 'check-circle' | 'exclamation-triangle' | 'information-circle' | 'video' | 'calendar' | 'clock';
+type IconName = 'user' | 'users' | 'logout' | 'dashboard' | 'chat' | 'scenario' | 'caption' | 'image' | 'plan' | 'report' | 'idea' | 'broadcast' | 'back' | 'trash' | 'edit' | 'send' | 'microphone' | 'stop' | 'plus' | 'key' | 'lock-closed' | 'menu' | 'document-text' | 'chart-bar' | 'upload' | 'phone-wave' | 'crown' | 'paperclip' | 'check-circle' | 'exclamation-triangle' | 'information-circle' | 'video' | 'calendar' | 'clock' | 'coffee' | 'refresh' | 'save' | 'x-circle';
 
 interface IconProps {
   name: IconName;
@@ -43,7 +43,29 @@ const ICONS: Record<IconName, React.ReactNode> = {
     'video': <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9A2.25 2.25 0 004.5 18.75z" />,
     'calendar': <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0h18M-9 11.25h.008v.008H-9v-.008z" />,
     'clock': <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />,
+    'coffee': <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />, // Placeholder for simple coffee, actually used as a positive circle check or similar
+    'refresh': <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />,
+    'save': <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V7.5m-18 0l5.25-5.25h9L21 7.5m-18 0h18" />,
+    'x-circle': <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />,
 };
+
+// Manually override the coffee icon with a proper SVG
+ICONS.coffee = <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />; // Use a simple circle-x or check for now, or replace with:
+ICONS.coffee = <path strokeLinecap="round" strokeLinejoin="round" d="M15.182 15.182a4.5 4.5 0 01-6.364 0M21 12a9 9 0 11-18 0 9 9 0 0118 0zM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75zm-.375 0h.008v.015h-.008V9.75zm5.625 0c0 .414-.168.75-.375.75s-.375-.336-.375-.75.168-.75.375-.75.375.336.375.75zm-.375 0h.008v.015h-.008V9.75z" />
+
+// Real Coffee Icon override
+ICONS.coffee = (
+  <path
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"
+  />
+);
+// Simpler coffee/cup icon
+ICONS.coffee = (
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L8.11 20.389a3 3 0 01-2.122.879H5.988a3 3 0 01-2.122-.879L3.855 20.39A3 3 0 012.976 18.26v-7.01a3 3 0 012.99-3h6.98a3 3 0 012.99 3v.75M9 17.25h6m0 0v3.75a3 3 0 01-3 3h-3m0-17.25V2.25M12 5.25V2.25M15 5.25V2.25" />
+);
+
 
 export const Icon: React.FC<IconProps> = ({ name, className = 'w-6 h-6' }) => {
   return (

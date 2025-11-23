@@ -549,6 +549,12 @@ export const addProductionEvent = async (event: Omit<ProductionEvent, 'id' | 'cr
     if (error) handleError(error, 'addProductionEvent');
 };
 
+export const updateProductionEvent = async (id: number, event: Partial<ProductionEvent>): Promise<void> => {
+    if (!supabase) return;
+    const { error } = await supabase.from('production_events').update(event).eq('id', id);
+    if (error) handleError(error, 'updateProductionEvent');
+};
+
 export const deleteProductionEvent = async (id: number): Promise<void> => {
     if (!supabase) return;
     const { error } = await supabase.from('production_events').delete().eq('id', id);
