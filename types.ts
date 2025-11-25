@@ -146,7 +146,7 @@ export interface EditorTask {
   scenario_number: number;
   assigned_editor_id: number | null;
   editor_name?: string; // Joined field
-  status: 'pending_assignment' | 'assigned' | 'delivered' | 'issue_reported';
+  status: 'pending_assignment' | 'assigned' | 'delivered' | 'issue_reported' | 'pending_approval';
   admin_note: string | null;
   editor_note: string | null;
   created_at: string;
@@ -161,6 +161,15 @@ export interface ProductionEvent {
   end_time: string;
   description?: string;
   created_at: string;
+}
+
+export interface AdminChecklistItem {
+  id: number;
+  admin_id: number;
+  title: string;
+  is_done: boolean;
+  is_for_today: boolean;
+  position: number;
 }
 
 export interface Plan {

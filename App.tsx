@@ -1,22 +1,19 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { User } from './types';
-import { verifyAccessCode, isUserAdmin, getUserById } from './services/dbService';
+import { verifyAccessCode, getUserById } from './services/dbService';
 import WelcomeScreen from './components/auth/WelcomeScreen';
 import AdminView from './components/admin/AdminView';
 import UserView from './components/user/UserView';
 import EditorView from './components/editor/EditorView';
 import { Loader } from './components/common/Loader';
-import { Icon } from './components/common/Icon';
 import { UserProvider } from './contexts/UserContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
-  const [isBlocked, setIsBlocked] = useState<boolean>(false);
   const [showExpiredSubscriptionMessage, setShowExpiredSubscriptionMessage] = useState(false);
 
 
@@ -57,25 +54,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const initializeApp = async () => {
-      // 1. Check IP Location
-      try {
-        const response = await fetch('https://ipapi.co/json/');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.country_code === 'IR') {
-            setIsBlocked(true);
-            setIsLoading(false); // We are done loading, just show block screen
-            return; // Stop initialization
-          }
-        } else {
-          // If the geo IP service fails, don't block the user.
-          console.warn(`GeoIP service failed with status: ${response.status}. Allowing access.`);
-        }
-      } catch (err) {
-        console.warn('Could not perform IP location check. Allowing access.', err);
-      }
-
-      // 2. If not blocked, proceed with session check
+      // Check for existing session
       const storedUserId = localStorage.getItem('userId');
       if (storedUserId) {
         const userId = parseInt(storedUserId, 10);
@@ -89,7 +68,6 @@ const App: React.FC = () => {
                   setError('اشتراک شما به پایان رسیده است. برای تمدید، با پشتیبانی در تلگرام در ارتباط باشید.');
               } else {
                   setCurrentUser(user);
-                  setIsAdmin(user.role === 'admin');
               }
             } else {
               localStorage.removeItem('userId');
@@ -122,7 +100,6 @@ const App: React.FC = () => {
           return false;
         }
         setCurrentUser(user);
-        setIsAdmin(user.role === 'admin');
         localStorage.setItem('userId', String(user.user_id));
         return true;
       } else {
@@ -139,11 +116,8 @@ const App: React.FC = () => {
 
   const handleLogout = useCallback(() => {
     setCurrentUser(null);
-    setIsAdmin(false);
     localStorage.removeItem('userId');
-    // Clear the URL hash to prevent automatic navigation on re-login
     history.pushState(null, '', window.location.pathname);
-    // Force a reload to ensure all state is cleared and prevent auto-login loops
     window.location.reload();
   }, []);
   
@@ -169,16 +143,6 @@ const App: React.FC = () => {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-900">
         <Loader />
-      </div>
-    );
-  }
-  
-  if (isBlocked) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-center p-4">
-        <Icon name="lock-closed" className="w-16 h-16 text-red-500 mb-4" />
-        <h1 className="text-2xl font-bold text-white">دسترسی امکان‌پذیر نیست</h1>
-        <p className="mt-2 text-slate-300">برای استفاده از برنامه، لطفاً VPN خود را روشن کنید.</p>
       </div>
     );
   }

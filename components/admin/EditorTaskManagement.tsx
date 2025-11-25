@@ -19,7 +19,7 @@ const EditorTaskManagement: React.FC = () => {
     const [selectedEditor, setSelectedEditor] = useState<User | null>(null);
 
     // Filter states for Kanban
-    const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'active' | 'delivered'>('pending');
+    const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'active' | 'approval' | 'delivered'>('pending');
 
     const fetchData = useCallback(async () => {
         setIsLoading(true);
@@ -51,6 +51,42 @@ const EditorTaskManagement: React.FC = () => {
             showNotification('خطا در اختصاص پروژه.', 'error');
         }
     };
+    
+    const handleApprove = async (taskId: number) => {
+        if(!confirm('آیا از تایید نهایی و آرشیو این پروژه اطمینان دارید؟')) return;
+        try {
+            // Option A: Mark as delivered (archived)
+            await db.updateEditorTaskStatus(taskId, 'delivered');
+            // Option B: Delete the task if "Archiving" means removing from DB
+            // await db.deleteEditorTask(taskId); 
+            showNotification('پروژه تایید و به لیست تحویل شده‌ها منتقل شد.', 'success');
+            fetchData();
+        } catch (error) {
+            showNotification('خطا در تایید پروژه.', 'error');
+        }
+    };
+
+    const handleReject = async (taskId: number, note: string) => {
+        if (!note) {
+            showNotification('لطفاً دلیل عدم تایید را در بخش یادداشت بنویسید.', 'error');
+            return;
+        }
+        try {
+            await db.updateEditorTaskStatus(taskId, 'issue_reported', undefined); // Status back to issue/active
+            // Ideally we should append the rejection note to admin_note or a new field, here using assign to update note
+            // Assuming we can update just the note via a separate call or reusing assign logic without changing editor
+            // For simplicity reusing assign with current editor
+            const task = tasks.find(t => t.id === taskId);
+            if (task && task.assigned_editor_id) {
+                 await db.assignEditorTask(taskId, task.assigned_editor_id, `[عدم تایید]: ${note}`);
+            }
+            
+            showNotification('پروژه عدم تایید شد و به تدوینگر برگشت.', 'info');
+            fetchData();
+        } catch (error) {
+            showNotification('خطا در رد پروژه.', 'error');
+        }
+    };
 
     const handleViewProfile = (editor: User) => {
         setSelectedEditor(editor);
@@ -65,12 +101,12 @@ const EditorTaskManagement: React.FC = () => {
             if (filterStatus === 'all') return true;
             if (filterStatus === 'pending') return task.status === 'pending_assignment';
             if (filterStatus === 'active') return task.status === 'assigned' || task.status === 'issue_reported';
+            if (filterStatus === 'approval') return task.status === 'pending_approval';
             if (filterStatus === 'delivered') return task.status === 'delivered';
             return true;
         });
 
         const TaskCard: React.FC<{ task: EditorTask }> = ({ task }) => {
-            // Fix: Sync initial state with props using optional chaining and fallback
             const [taskEditorId, setTaskEditorId] = useState(task.assigned_editor_id ? String(task.assigned_editor_id) : '');
             const [adminNote, setAdminNote] = useState(task.admin_note || '');
             const [isRecording, setIsRecording] = useState(false);
@@ -79,7 +115,6 @@ const EditorTaskManagement: React.FC = () => {
             const mediaRecorderRef = useRef<MediaRecorder | null>(null);
             const isAssigned = task.status !== 'pending_assignment';
 
-            // Fix: Update local state when prop changes (crucial for re-renders after fetch)
             useEffect(() => {
                 setTaskEditorId(task.assigned_editor_id ? String(task.assigned_editor_id) : '');
             }, [task.assigned_editor_id]);
@@ -149,7 +184,7 @@ const EditorTaskManagement: React.FC = () => {
             };
 
             return (
-                <div className={`p-4 rounded-lg border ${task.status === 'issue_reported' ? 'bg-red-900/20 border-red-500' : 'bg-slate-800 border-slate-700'}`}>
+                <div className={`p-4 rounded-lg border ${task.status === 'issue_reported' ? 'bg-red-900/20 border-red-500' : task.status === 'pending_approval' ? 'bg-green-900/20 border-green-500' : 'bg-slate-800 border-slate-700'}`}>
                     <div className="flex justify-between items-start mb-3">
                         <div>
                             <h3 className="font-bold text-white">سناریو شماره {task.scenario_number}</h3>
@@ -173,79 +208,116 @@ const EditorTaskManagement: React.FC = () => {
                             <p className="text-slate-300 text-sm mt-1">{task.editor_note}</p>
                         </div>
                     )}
+                    
+                    {task.status === 'pending_approval' && (
+                        <div className="mb-4 bg-green-900/50 p-3 rounded border border-green-700 text-center">
+                            <p className="text-green-200 font-bold text-sm">
+                                ✅ تدوینگر کار را تحویل داده است.
+                            </p>
+                            <p className="text-xs text-slate-300 mt-1">لطفاً بررسی و تایید یا رد کنید.</p>
+                        </div>
+                    )}
 
                     <div className="flex flex-col gap-3 mt-4 border-t border-slate-700 pt-4">
-                        <div className="grid grid-cols-1 gap-3">
-                            <div>
-                                <label className="block text-xs text-slate-400 mb-2">انتخاب تدوینگر</label>
-                                <div className="flex flex-wrap gap-2">
-                                    {editors.map(ed => {
-                                        const isSelected = taskEditorId === String(ed.user_id);
-                                        return (
-                                            <button
-                                                key={ed.user_id}
-                                                onClick={() => setTaskEditorId(String(ed.user_id))}
-                                                disabled={isAssigned && task.status !== 'issue_reported'}
-                                                className={`px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
-                                                    isSelected
-                                                    ? 'bg-violet-600 border-violet-500 text-white shadow-md transform scale-105'
-                                                    : 'bg-slate-900 border-slate-600 text-slate-400 hover:border-slate-500 hover:text-slate-300'
-                                                } ${isAssigned && task.status !== 'issue_reported' ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                            >
-                                                {ed.full_name}
-                                            </button>
-                                        )
-                                    })}
+                        {task.status !== 'pending_approval' && (
+                            <div className="grid grid-cols-1 gap-3">
+                                <div>
+                                    <label className="block text-xs text-slate-400 mb-2">انتخاب تدوینگر</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {editors.map(ed => {
+                                            const isSelected = taskEditorId === String(ed.user_id);
+                                            return (
+                                                <button
+                                                    key={ed.user_id}
+                                                    onClick={() => setTaskEditorId(String(ed.user_id))}
+                                                    disabled={isAssigned && task.status !== 'issue_reported'}
+                                                    className={`px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
+                                                        isSelected
+                                                        ? 'bg-violet-600 border-violet-500 text-white shadow-md transform scale-105'
+                                                        : 'bg-slate-900 border-slate-600 text-slate-400 hover:border-slate-500 hover:text-slate-300'
+                                                    } ${isAssigned && task.status !== 'issue_reported' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                >
+                                                    {ed.full_name}
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-slate-400 mb-1">یادداشت مدیر (متن، فایل، ویس)</label>
+                                    <div className="flex gap-2 mb-2">
+                                        <input 
+                                            type="text" 
+                                            value={adminNote} 
+                                            onChange={(e) => setAdminNote(e.target.value)}
+                                            placeholder="توضیحات برای تدوینگر..."
+                                            className="flex-1 bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white"
+                                        />
+                                        <button 
+                                            onClick={() => fileInputRef.current?.click()} 
+                                            disabled={isUploading}
+                                            className="p-2 bg-slate-700 rounded hover:bg-slate-600 text-slate-300" 
+                                            title="پیوست فایل"
+                                        >
+                                            <Icon name="paperclip" className="w-5 h-5"/>
+                                        </button>
+                                        <button 
+                                            onClick={isRecording ? stopRecording : startRecording}
+                                            disabled={isUploading} 
+                                            className={`p-2 rounded transition-colors ${isRecording ? 'bg-red-600 text-white animate-pulse' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+                                            title={isRecording ? 'توقف ضبط' : 'ضبط ویس'}
+                                        >
+                                            <Icon name={isRecording ? 'stop' : 'microphone'} className="w-5 h-5"/>
+                                        </button>
+                                        <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
+                                    </div>
+                                    {isUploading && <span className="text-xs text-violet-400 animate-pulse">در حال آپلود...</span>}
                                 </div>
                             </div>
-                            <div>
-                                <label className="block text-xs text-slate-400 mb-1">یادداشت مدیر (متن، فایل، ویس)</label>
-                                <div className="flex gap-2 mb-2">
+                        )}
+                        
+                        {task.status === 'pending_approval' ? (
+                            <div className="flex gap-2">
+                                <div className="flex-1">
                                     <input 
                                         type="text" 
                                         value={adminNote} 
                                         onChange={(e) => setAdminNote(e.target.value)}
-                                        placeholder="توضیحات برای تدوینگر..."
-                                        className="flex-1 bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white"
+                                        placeholder="علت عدم تایید (الزامی برای رد)"
+                                        className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white mb-2"
                                     />
                                     <button 
-                                        onClick={() => fileInputRef.current?.click()} 
-                                        disabled={isUploading}
-                                        className="p-2 bg-slate-700 rounded hover:bg-slate-600 text-slate-300" 
-                                        title="پیوست فایل"
+                                        onClick={() => handleReject(task.id, adminNote)}
+                                        className="w-full py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
                                     >
-                                        <Icon name="paperclip" className="w-5 h-5"/>
+                                        عدم تایید و بازگشت
                                     </button>
-                                    <button 
-                                        onClick={isRecording ? stopRecording : startRecording}
-                                        disabled={isUploading} 
-                                        className={`p-2 rounded transition-colors ${isRecording ? 'bg-red-600 text-white animate-pulse' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
-                                        title={isRecording ? 'توقف ضبط' : 'ضبط ویس'}
-                                    >
-                                        <Icon name={isRecording ? 'stop' : 'microphone'} className="w-5 h-5"/>
-                                    </button>
-                                    <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
                                 </div>
-                                {isUploading && <span className="text-xs text-violet-400 animate-pulse">در حال آپلود...</span>}
+                                <button 
+                                    onClick={() => handleApprove(task.id)}
+                                    className="flex-1 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-bold self-end h-[72px]"
+                                >
+                                    تایید نهایی (آرشیو)
+                                </button>
                             </div>
-                        </div>
-                        
-                        <button 
-                            onClick={() => handleAssign(task.id, taskEditorId, adminNote)}
-                            disabled={!taskEditorId || isUploading || isRecording}
-                            className={`w-full py-2 rounded font-semibold transition-colors ${
-                                isAssigned 
-                                ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' 
-                                : 'bg-violet-600 text-white hover:bg-violet-700'
-                            }`}
-                        >
-                            {isAssigned ? 'بروزرسانی وضعیت / تدوینگر' : 'تایید و ارجاع به تدوینگر'}
-                        </button>
+                        ) : (
+                            <button 
+                                onClick={() => handleAssign(task.id, taskEditorId, adminNote)}
+                                disabled={(!taskEditorId || isUploading || isRecording) && task.status !== 'delivered'}
+                                className={`w-full py-2 rounded font-semibold transition-colors ${
+                                    isAssigned 
+                                    ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' 
+                                    : 'bg-violet-600 text-white hover:bg-violet-700'
+                                }`}
+                            >
+                                {isAssigned ? 'بروزرسانی وضعیت / تدوینگر' : 'تایید و ارجاع به تدوینگر'}
+                            </button>
+                        )}
                     </div>
                     
                     {task.status === 'delivered' && (
                         <div className="mt-3 text-center text-green-400 text-sm font-bold bg-green-900/20 p-2 rounded">
-                            ✅ تحویل داده شده
+                            ✅ تحویل و آرشیو شده
                         </div>
                     )}
                 </div>
@@ -258,7 +330,8 @@ const EditorTaskManagement: React.FC = () => {
                     {[
                         { key: 'pending', label: 'در انتظار تخصیص' },
                         { key: 'active', label: 'در حال انجام / دارای مشکل' },
-                        { key: 'delivered', label: 'تحویل داده شده' },
+                        { key: 'approval', label: 'در انتظار تایید' },
+                        { key: 'delivered', label: 'آرشیو شده' },
                         { key: 'all', label: 'همه موارد' },
                     ].map(tab => (
                         <button
@@ -395,7 +468,7 @@ const EditorTaskManagement: React.FC = () => {
         );
     };
 
-    // 3. PROFILE PERFORMANCE VIEW
+    // 3. PROFILE PERFORMANCE VIEW (Same as before, just ensuring filtered logic works)
     const ProfilePerformanceView = () => {
         const [timeRange, setTimeRange] = useState<'week' | 'month' | 'all'>('all');
         
@@ -415,7 +488,6 @@ const EditorTaskManagement: React.FC = () => {
         // Calculate Stats
         const totalAssigned = filteredHistory.length;
         const delivered = filteredHistory.filter(t => t.status === 'delivered').length;
-        const active = filteredHistory.filter(t => t.status === 'assigned').length;
         const issues = filteredHistory.filter(t => t.status === 'issue_reported').length;
         const completionRate = totalAssigned > 0 ? Math.round((delivered / totalAssigned) * 100) : 0;
 
@@ -499,7 +571,8 @@ const EditorTaskManagement: React.FC = () => {
                                                     'bg-yellow-900/30 text-yellow-400'
                                                 }`}>
                                                     {task.status === 'delivered' ? 'تحویل شده' : 
-                                                     task.status === 'issue_reported' ? 'دارای مشکل' : 'در حال انجام'}
+                                                     task.status === 'issue_reported' ? 'دارای مشکل' : 
+                                                     task.status === 'pending_approval' ? 'منتظر تایید' : 'در حال انجام'}
                                                 </span>
                                             </td>
                                         </tr>

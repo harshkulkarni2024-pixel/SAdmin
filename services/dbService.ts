@@ -1,10 +1,10 @@
 
-import type { User, PostScenario, Plan, Report, Caption, PostIdea, ActivityLog, ChatMessage, SubscriptionHistory, AlgorithmNews, CompetitorAnalysisHistory, EditorTask, ProductionEvent } from '../types';
+import type { User, PostScenario, Plan, Report, Caption, PostIdea, ActivityLog, ChatMessage, SubscriptionHistory, AlgorithmNews, CompetitorAnalysisHistory, EditorTask, ProductionEvent, AdminChecklistItem } from '../types';
 import { supabase, SUPABASE_INIT_ERROR } from './supabaseClient';
 
 // --- Constants ---
 const ADMIN_IDS = [1337]; 
-const ADMIN_DB_ACCESS_CODE = 'Item8'; 
+const ADMIN_DB_ACCESS_CODE = 'Item8'; // Legacy code, keeping for fallback but 'M77m' is new super admin
 
 // --- Helper Functions ---
 const handleError = (error: any, context: string) => {
@@ -40,32 +40,12 @@ export const verifyAccessCode = async (code: string, isSessionLogin: boolean = f
     }
 
     if (!user) {
-        // Special handling for hardcoded admin fallback if DB is empty/fresh
-        if (!isSessionLogin && code === ADMIN_DB_ACCESS_CODE) {
-             const { data: adminUser, error: adminError } = await supabase.from('users').select('*').eq('user_id', ADMIN_IDS[0]).single();
-             if (adminError) {
-                 // If database is fresh and no admin exists, return a mock admin for first-time setup instructions
-                 return {
-                     user_id: ADMIN_IDS[0],
-                     full_name: 'مدیر سیستم',
-                     access_code: ADMIN_DB_ACCESS_CODE,
-                     is_verified: true,
-                     role: 'admin',
-                     story_requests: 0,
-                     chat_messages: 0,
-                     last_request_date: new Date().toISOString(),
-                 } as User;
-             }
-             return { ...adminUser, role: 'admin' };
-        }
         return null;
     }
     
-    // Assign roles based on data or hardcoded logic
-    if (isUserAdmin(user.user_id)) {
-        user.role = 'admin';
-    } else if (user.role !== 'editor') {
-        // Ensure regular users have 'user' role if not specified
+    // Roles are now properly handled in DB (role column)
+    // Just ensuring basic fallback if needed
+    if (user.role !== 'editor' && user.role !== 'admin') {
         user.role = 'user';
     }
 
@@ -126,9 +106,9 @@ export const getAllUsers = async (): Promise<User[]> => {
     // Exclude admin and editors from the general user list
     const { data, error } = await supabase.from('users')
         .select('*')
-        .neq('user_id', ADMIN_IDS[0])
+        .neq('role', 'admin')
         .neq('role', 'editor')
-        .or('role.is.null,role.eq.user'); // Handle legacy rows where role might be null
+        .or('role.is.null,role.eq.user');
         
     if (error) handleError(error, 'getAllUsers');
     return data || [];
@@ -138,6 +118,13 @@ export const getAllEditors = async (): Promise<User[]> => {
     if (!supabase) throw new Error(SUPABASE_INIT_ERROR);
     const { data, error } = await supabase.from('users').select('*').eq('role', 'editor').order('created_at', { ascending: false });
     if (error) handleError(error, 'getAllEditors');
+    return data || [];
+};
+
+export const getAllAdmins = async (): Promise<User[]> => {
+    if (!supabase) throw new Error(SUPABASE_INIT_ERROR);
+    const { data, error } = await supabase.from('users').select('*').eq('role', 'admin');
+    if (error) handleError(error, 'getAllAdmins');
     return data || [];
 };
 
@@ -190,6 +177,28 @@ export const addUser = async (fullName: string, accessCode: string, isVip: boole
         return { success: false, message: `خطا در افزودن کاربر: ${error.message}` };
     }
     return { success: true, message: `کاربر '${fullName}' با موفقیت اضافه شد.` };
+};
+
+export const addAdmin = async (fullName: string, accessCode: string): Promise<{ success: boolean, message: string }> => {
+    if (!supabase) return { success: false, message: SUPABASE_INIT_ERROR };
+    
+    const { data: existingUser, error: checkError } = await supabase.from('users').select('user_id').eq('access_code', accessCode).single();
+    if (existingUser) return { success: false, message: 'کد دسترسی تکراری است.' };
+
+    const newAdmin = {
+        user_id: Date.now(),
+        full_name: fullName,
+        access_code: accessCode,
+        is_verified: true,
+        role: 'admin',
+        story_requests: 0,
+        chat_messages: 0,
+        last_request_date: new Date().toISOString(),
+    };
+    
+    const { error } = await supabase.from('users').insert(newAdmin);
+    if (error) return { success: false, message: error.message };
+    return { success: true, message: `ادمین ${fullName} اضافه شد.` };
 };
 
 export const addEditor = async (fullName: string, accessCode: string): Promise<{ success: boolean, message: string }> => {
@@ -511,6 +520,12 @@ export const updateEditorTaskStatus = async (taskId: number, status: EditorTask[
     if (error) handleError(error, 'updateEditorTaskStatus');
 };
 
+export const deleteEditorTask = async (taskId: number): Promise<void> => {
+    if (!supabase) return;
+    const { error } = await supabase.from('editor_tasks').delete().eq('id', taskId);
+    if(error) handleError(error, 'deleteEditorTask');
+};
+
 export const uploadFile = async (file: File): Promise<string | null> => {
     if (!supabase) return null;
     const fileName = `${Date.now()}_${file.name}`;
@@ -575,6 +590,47 @@ export const deleteProductionEvent = async (id: number): Promise<void> => {
     if (!supabase) return;
     const { error } = await supabase.from('production_events').delete().eq('id', id);
     if (error) handleError(error, 'deleteProductionEvent');
+};
+
+// --- Admin Checklist ---
+
+export const getAdminChecklist = async (adminId: number): Promise<AdminChecklistItem[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase
+        .from('admin_checklist')
+        .select('*')
+        .eq('admin_id', adminId)
+        .order('position', { ascending: true })
+        .order('created_at', { ascending: false });
+    
+    if (error) {
+        handleError(error, 'getAdminChecklist');
+        return [];
+    }
+    return data || [];
+};
+
+export const addAdminChecklistItem = async (adminId: number, title: string, isForToday: boolean, position: number): Promise<void> => {
+    if (!supabase) return;
+    const { error } = await supabase.from('admin_checklist').insert({
+        admin_id: adminId,
+        title,
+        is_for_today: isForToday,
+        position
+    });
+    if (error) handleError(error, 'addAdminChecklistItem');
+};
+
+export const updateAdminChecklistItem = async (itemId: number, updates: Partial<AdminChecklistItem>): Promise<void> => {
+    if (!supabase) return;
+    const { error } = await supabase.from('admin_checklist').update(updates).eq('id', itemId);
+    if (error) handleError(error, 'updateAdminChecklistItem');
+};
+
+export const deleteAdminChecklistItem = async (itemId: number): Promise<void> => {
+    if (!supabase) return;
+    const { error } = await supabase.from('admin_checklist').delete().eq('id', itemId);
+    if (error) handleError(error, 'deleteAdminChecklistItem');
 };
 
 

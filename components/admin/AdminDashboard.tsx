@@ -5,6 +5,7 @@ import * as db from '../../services/dbService';
 import { Icon } from '../common/Icon';
 import { Loader } from '../common/Loader';
 import { AdminViewType } from './AdminView';
+import AdminChecklist from './AdminChecklist'; // Import new component
 
 interface ReportStats {
     delivered: number;
@@ -128,7 +129,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
                     if (task.assigned_editor_id && editorMap[task.assigned_editor_id]) {
                         if (task.status === 'delivered') {
                             editorMap[task.assigned_editor_id].delivered++;
-                        } else if (task.status === 'assigned' || task.status === 'issue_reported') {
+                        } else if (task.status === 'assigned' || task.status === 'issue_reported' || task.status === 'pending_approval') {
                             editorMap[task.assigned_editor_id].active++;
                         }
                     }
@@ -174,6 +175,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
                 <p className="text-slate-400 mt-1">آمار کلی و وضعیت کاربران در یک نگاه.</p>
             </div>
 
+            {/* Admin Checklist Widget - Moved to Top */}
+            <div className="w-full h-96">
+                <AdminChecklist />
+            </div>
+
+            {/* Navigation Buttons */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <button onClick={() => onNavigate('editor_tasks')} className="bg-violet-600 p-4 rounded-xl flex items-center text-right group hover:bg-violet-700 transition-all duration-300 transform hover:-translate-y-1 shadow-lg shadow-violet-900/20">
                     <div className="bg-white/20 p-3 rounded-full me-4">
@@ -206,46 +213,48 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
                 </button>
             </div>
             
-            {/* Upcoming Shoots Widget */}
-            <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
-                <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                    <Icon name="video" className="w-6 h-6 text-indigo-400"/>
-                    برنامه ضبط روزهای آینده
-                </h2>
-                {productionEvents.length === 0 ? (
-                    <div className="text-center py-6 text-slate-500 text-sm">
-                        هیچ برنامه ضبطی برای روزهای آینده ثبت نشده است.
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-                        {productionEvents.map(event => {
-                            const start = new Date(event.start_time);
-                            const isToday = new Date().toDateString() === start.toDateString();
-                            const style = EVENT_TYPE_STYLES[event.event_type] || EVENT_TYPE_STYLES.post;
-                            
-                            return (
-                                <div key={event.id} className={`rounded-lg p-3 border border-slate-700 flex flex-col justify-between ${style.bg} relative overflow-hidden`}>
-                                    {isToday && <span className="absolute top-0 right-0 bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-bl-md font-bold">امروز</span>}
-                                    <div>
-                                        <div className="flex items-center gap-1 mb-2 opacity-80">
-                                            <Icon name={style.icon} className={`w-4 h-4 ${style.text}`}/>
-                                            <span className={`text-xs font-bold ${style.text}`}>{event.event_type === 'post' ? 'پست' : event.event_type === 'story' ? 'استوری' : event.event_type === 'off' ? 'آف' : 'جلسه'}</span>
+            <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+                {/* Upcoming Shoots Widget */}
+                <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
+                    <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                        <Icon name="video" className="w-6 h-6 text-indigo-400"/>
+                        برنامه ضبط روزهای آینده
+                    </h2>
+                    {productionEvents.length === 0 ? (
+                        <div className="text-center py-6 text-slate-500 text-sm">
+                            هیچ برنامه ضبطی برای روزهای آینده ثبت نشده است.
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+                            {productionEvents.map(event => {
+                                const start = new Date(event.start_time);
+                                const isToday = new Date().toDateString() === start.toDateString();
+                                const style = EVENT_TYPE_STYLES[event.event_type] || EVENT_TYPE_STYLES.post;
+                                
+                                return (
+                                    <div key={event.id} className={`rounded-lg p-3 border border-slate-700 flex flex-col justify-between ${style.bg} relative overflow-hidden`}>
+                                        {isToday && <span className="absolute top-0 right-0 bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-bl-md font-bold">امروز</span>}
+                                        <div>
+                                            <div className="flex items-center gap-1 mb-2 opacity-80">
+                                                <Icon name={style.icon} className={`w-4 h-4 ${style.text}`}/>
+                                                <span className={`text-xs font-bold ${style.text}`}>{event.event_type === 'post' ? 'پست' : event.event_type === 'story' ? 'استوری' : event.event_type === 'off' ? 'آف' : 'جلسه'}</span>
+                                            </div>
+                                            <h4 className="font-bold text-white text-sm mb-1 truncate">{event.project_name}</h4>
+                                            <p className="text-xs text-slate-300 font-mono">
+                                                {start.toLocaleTimeString('fa-IR', {hour: '2-digit', minute:'2-digit'})}
+                                            </p>
                                         </div>
-                                        <h4 className="font-bold text-white text-sm mb-1 truncate">{event.project_name}</h4>
-                                        <p className="text-xs text-slate-300 font-mono">
-                                            {start.toLocaleTimeString('fa-IR', {hour: '2-digit', minute:'2-digit'})}
-                                        </p>
+                                        <div className="mt-2 pt-2 border-t border-white/10 text-xs text-slate-300 text-center">
+                                            {start.toLocaleDateString('fa-IR', {weekday: 'long', day:'numeric', month:'numeric'})}
+                                        </div>
                                     </div>
-                                    <div className="mt-2 pt-2 border-t border-white/10 text-xs text-slate-300 text-center">
-                                        {start.toLocaleDateString('fa-IR', {weekday: 'long', day:'numeric', month:'numeric'})}
-                                    </div>
-                                </div>
-                            )
-                        })}
+                                )
+                            })}
+                        </div>
+                    )}
+                    <div className="mt-4 text-center">
+                        <button onClick={() => onNavigate('production_calendar')} className="text-sm text-indigo-400 hover:text-indigo-300">مشاهده تقویم کامل</button>
                     </div>
-                )}
-                <div className="mt-4 text-center">
-                    <button onClick={() => onNavigate('production_calendar')} className="text-sm text-indigo-400 hover:text-indigo-300">مشاهده تقویم کامل</button>
                 </div>
             </div>
 

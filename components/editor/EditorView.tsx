@@ -49,8 +49,8 @@ const EditorView: React.FC = () => {
             
             // LOG THE ACTIVITY
             let logMessage = '';
-            if (status === 'delivered') {
-                logMessage = `پروژه سناریو شماره ${scenarioNumber} را تحویل داد.`;
+            if (status === 'pending_approval') {
+                logMessage = `پروژه سناریو شماره ${scenarioNumber} را جهت بررسی و تایید تحویل داد.`;
             } else if (status === 'issue_reported') {
                 logMessage = `برای پروژه سناریو شماره ${scenarioNumber} گزارش مشکل ثبت کرد.`;
             }
@@ -59,7 +59,7 @@ const EditorView: React.FC = () => {
                 await db.logActivity(user.user_id, logMessage);
             }
 
-            showNotification(status === 'delivered' ? 'پروژه با موفقیت تحویل داده شد.' : 'گزارش مشکل ثبت شد.', 'success');
+            showNotification(status === 'pending_approval' ? 'پروژه برای تایید مدیر ارسال شد.' : 'گزارش مشکل ثبت شد.', 'success');
             fetchTasks();
             setIssueModalTask(null);
             setIssueText('');
@@ -75,11 +75,14 @@ const EditorView: React.FC = () => {
         return true;
     });
 
-    // Sort: Active tasks first, then delivered
+    // Sort: Active tasks first, then pending approval, then delivered
     filteredTasks.sort((a, b) => {
-        if (a.status === 'delivered' && b.status !== 'delivered') return 1;
-        if (a.status !== 'delivered' && b.status === 'delivered') return -1;
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        const getRank = (status: string) => {
+            if (status === 'assigned' || status === 'issue_reported') return 3;
+            if (status === 'pending_approval') return 2;
+            return 1; // delivered
+        };
+        return getRank(b.status) - getRank(a.status) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
 
     if (!user) return <Loader />;
@@ -123,10 +126,15 @@ const EditorView: React.FC = () => {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {filteredTasks.map(task => (
-                            <div key={task.id} className={`relative bg-slate-800 rounded-xl overflow-hidden border ${task.status === 'delivered' ? 'border-green-900/50 opacity-75' : 'border-slate-700 shadow-lg'}`}>
+                            <div key={task.id} className={`relative bg-slate-800 rounded-xl overflow-hidden border ${task.status === 'delivered' ? 'border-green-900/50 opacity-75' : task.status === 'pending_approval' ? 'border-blue-500/50' : 'border-slate-700 shadow-lg'}`}>
                                 {task.status === 'delivered' && (
                                     <div className="absolute top-0 right-0 bg-green-600 text-white text-xs font-bold px-2 py-1 rounded-bl-lg z-10">
-                                        تحویل داده شد
+                                        تحویل و آرشیو شده
+                                    </div>
+                                )}
+                                {task.status === 'pending_approval' && (
+                                    <div className="absolute top-0 right-0 bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded-bl-lg z-10">
+                                        در انتظار تایید مدیر
                                     </div>
                                 )}
                                 <div className="p-5">
@@ -149,10 +157,10 @@ const EditorView: React.FC = () => {
                                         </div>
                                     )}
 
-                                    {task.status !== 'delivered' && (
+                                    {task.status !== 'delivered' && task.status !== 'pending_approval' && (
                                         <div className="flex gap-2 mt-4">
                                             <button 
-                                                onClick={() => handleStatusUpdate(task.id, 'delivered', undefined, task.scenario_number)}
+                                                onClick={() => handleStatusUpdate(task.id, 'pending_approval', undefined, task.scenario_number)}
                                                 className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-sm font-medium transition-colors flex justify-center items-center gap-1"
                                             >
                                                 <Icon name="check-circle" className="w-4 h-4"/>
@@ -170,6 +178,11 @@ const EditorView: React.FC = () => {
                                     {task.status === 'issue_reported' && (
                                         <div className="mt-2 text-center text-xs text-red-400">
                                             آخرین وضعیت: گزارش مشکل ارسال شده است.
+                                        </div>
+                                    )}
+                                    {task.status === 'pending_approval' && (
+                                        <div className="mt-2 text-center text-xs text-blue-300 animate-pulse">
+                                            منتظر بررسی مدیر...
                                         </div>
                                     )}
                                 </div>
