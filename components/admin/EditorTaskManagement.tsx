@@ -267,7 +267,7 @@ const EditorTaskManagement: React.FC = () => {
                                             className={`p-2 rounded transition-colors ${isRecording ? 'bg-red-600 text-white animate-pulse' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
                                             title={isRecording ? 'توقف ضبط' : 'ضبط ویس'}
                                         >
-                                            <Icon name="isRecording ? 'stop' : 'microphone'" className="w-5 h-5"/>
+                                            <Icon name={isRecording ? 'stop' : 'microphone'} className="w-5 h-5"/>
                                         </button>
                                         <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
                                     </div>
