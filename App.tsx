@@ -57,25 +57,10 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const initializeApp = async () => {
-      // 1. Check IP Location
-      try {
-        const response = await fetch('https://ipapi.co/json/');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.country_code === 'IR') {
-            setIsBlocked(true);
-            setIsLoading(false); // We are done loading, just show block screen
-            return; // Stop initialization
-          }
-        } else {
-          // If the geo IP service fails, don't block the user.
-          console.warn(`GeoIP service failed with status: ${response.status}. Allowing access.`);
-        }
-      } catch (err) {
-        console.warn('Could not perform IP location check. Allowing access.', err);
-      }
+      // REMOVED IP CHECK FOR PERFORMANCE AND VPN SUPPORT
+      // The app will now load immediately regardless of location.
 
-      // 2. If not blocked, proceed with session check
+      // 2. Proceed with session check
       const storedUserId = localStorage.getItem('userId');
       if (storedUserId) {
         const userId = parseInt(storedUserId, 10);
@@ -141,9 +126,7 @@ const App: React.FC = () => {
     setCurrentUser(null);
     setIsAdmin(false);
     localStorage.removeItem('userId');
-    // Clear the URL hash to prevent automatic navigation on re-login
     history.pushState(null, '', window.location.pathname);
-    // Force a reload to ensure all state is cleared and prevent auto-login loops
     window.location.reload();
   }, []);
   
