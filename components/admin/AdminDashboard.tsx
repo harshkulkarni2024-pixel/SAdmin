@@ -175,6 +175,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
                 <p className="text-slate-400 mt-1">آمار کلی و وضعیت کاربران در یک نگاه.</p>
             </div>
 
+            {/* Admin Checklist Widget - Moved to Top */}
+            <div className="w-full h-96">
+                <AdminChecklist />
+            </div>
+
+            {/* Navigation Buttons */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <button onClick={() => onNavigate('editor_tasks')} className="bg-violet-600 p-4 rounded-xl flex items-center text-right group hover:bg-violet-700 transition-all duration-300 transform hover:-translate-y-1 shadow-lg shadow-violet-900/20">
                     <div className="bg-white/20 p-3 rounded-full me-4">
@@ -207,9 +213,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
                 </button>
             </div>
             
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
                 {/* Upcoming Shoots Widget */}
-                <div className="lg:col-span-2 bg-slate-800 p-6 rounded-xl border border-slate-700">
+                <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
                     <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                         <Icon name="video" className="w-6 h-6 text-indigo-400"/>
                         برنامه ضبط روزهای آینده
@@ -219,7 +225,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
                             هیچ برنامه ضبطی برای روزهای آینده ثبت نشده است.
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
                             {productionEvents.map(event => {
                                 const start = new Date(event.start_time);
                                 const isToday = new Date().toDateString() === start.toDateString();
@@ -249,11 +255,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
                     <div className="mt-4 text-center">
                         <button onClick={() => onNavigate('production_calendar')} className="text-sm text-indigo-400 hover:text-indigo-300">مشاهده تقویم کامل</button>
                     </div>
-                </div>
-
-                {/* Admin Checklist Widget */}
-                <div className="lg:col-span-1 h-full">
-                    <AdminChecklist />
                 </div>
             </div>
 

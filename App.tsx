@@ -1,22 +1,20 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { User } from './types';
-import { verifyAccessCode, isUserAdmin, getUserById } from './services/dbService';
+import { verifyAccessCode, getUserById } from './services/dbService';
 import WelcomeScreen from './components/auth/WelcomeScreen';
 import AdminView from './components/admin/AdminView';
 import UserView from './components/user/UserView';
 import EditorView from './components/editor/EditorView';
 import { Loader } from './components/common/Loader';
-import { Icon } from './components/common/Icon';
 import { UserProvider } from './contexts/UserContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import NotificationRequest from './components/common/NotificationRequest';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
-  const [isBlocked, setIsBlocked] = useState<boolean>(false);
   const [showExpiredSubscriptionMessage, setShowExpiredSubscriptionMessage] = useState(false);
 
 
@@ -57,10 +55,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const initializeApp = async () => {
-      // REMOVED IP CHECK FOR PERFORMANCE AND VPN SUPPORT
-      // The app will now load immediately regardless of location.
-
-      // 2. Proceed with session check
+      // Check for existing session
       const storedUserId = localStorage.getItem('userId');
       if (storedUserId) {
         const userId = parseInt(storedUserId, 10);
@@ -74,7 +69,6 @@ const App: React.FC = () => {
                   setError('اشتراک شما به پایان رسیده است. برای تمدید، با پشتیبانی در تلگرام در ارتباط باشید.');
               } else {
                   setCurrentUser(user);
-                  setIsAdmin(user.role === 'admin');
               }
             } else {
               localStorage.removeItem('userId');
@@ -107,7 +101,6 @@ const App: React.FC = () => {
           return false;
         }
         setCurrentUser(user);
-        setIsAdmin(user.role === 'admin');
         localStorage.setItem('userId', String(user.user_id));
         return true;
       } else {
@@ -124,7 +117,6 @@ const App: React.FC = () => {
 
   const handleLogout = useCallback(() => {
     setCurrentUser(null);
-    setIsAdmin(false);
     localStorage.removeItem('userId');
     history.pushState(null, '', window.location.pathname);
     window.location.reload();
@@ -155,16 +147,6 @@ const App: React.FC = () => {
       </div>
     );
   }
-  
-  if (isBlocked) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-center p-4">
-        <Icon name="lock-closed" className="w-16 h-16 text-red-500 mb-4" />
-        <h1 className="text-2xl font-bold text-white">دسترسی امکان‌پذیر نیست</h1>
-        <p className="mt-2 text-slate-300">برای استفاده از برنامه، لطفاً VPN خود را روشن کنید.</p>
-      </div>
-    );
-  }
 
   return (
     <NotificationProvider>
@@ -172,12 +154,17 @@ const App: React.FC = () => {
         <div className="min-h-screen bg-slate-900 text-slate-100">
           {!currentUser ? (
             <WelcomeScreen onLogin={handleLogin} error={error} setError={setError} showExpiredLink={showExpiredSubscriptionMessage} />
-          ) : currentUser.role === 'admin' ? (
-            <AdminView />
-          ) : currentUser.role === 'editor' ? (
-            <EditorView />
           ) : (
-            <UserView />
+            <>
+              {currentUser.role === 'admin' ? (
+                <AdminView />
+              ) : currentUser.role === 'editor' ? (
+                <EditorView />
+              ) : (
+                <UserView />
+              )}
+              <NotificationRequest />
+            </>
           )}
         </div>
       </UserProvider>

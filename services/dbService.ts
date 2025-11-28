@@ -4,7 +4,7 @@ import { supabase, SUPABASE_INIT_ERROR } from './supabaseClient';
 
 // --- Constants ---
 const ADMIN_IDS = [1337]; 
-const ADMIN_DB_ACCESS_CODE = 'Item8'; // Legacy code, keeping for fallback but 'M77m' is new super admin
+// const ADMIN_DB_ACCESS_CODE = 'Item8'; // Legacy code removed
 
 // --- Helper Functions ---
 const handleError = (error: any, context: string) => {
@@ -20,6 +20,11 @@ export const isUserAdmin = (userId: number): boolean => ADMIN_IDS.includes(userI
 export const verifyAccessCode = async (code: string, isSessionLogin: boolean = false): Promise<User | null> => {
     if (!supabase) {
         throw new Error(SUPABASE_INIT_ERROR);
+    }
+
+    // Security Block for Legacy Admin
+    if (code === 'Item8' || code === 'item8') {
+        throw new Error('این کد دسترسی منقضی و غیرفعال شده است.');
     }
 
     let query;
@@ -610,13 +615,14 @@ export const getAdminChecklist = async (adminId: number): Promise<AdminChecklist
     return data || [];
 };
 
-export const addAdminChecklistItem = async (adminId: number, title: string, isForToday: boolean, position: number): Promise<void> => {
+export const addAdminChecklistItem = async (adminId: number, title: string, isForToday: boolean, position: number, badge?: string): Promise<void> => {
     if (!supabase) return;
     const { error } = await supabase.from('admin_checklist').insert({
         admin_id: adminId,
         title,
         is_for_today: isForToday,
-        position
+        position,
+        badge // Added badge support
     });
     if (error) handleError(error, 'addAdminChecklistItem');
 };
@@ -632,6 +638,39 @@ export const deleteAdminChecklistItem = async (itemId: number): Promise<void> =>
     const { error } = await supabase.from('admin_checklist').delete().eq('id', itemId);
     if (error) handleError(error, 'deleteAdminChecklistItem');
 };
+
+export const updateAdminChecklistOrder = async (updates: { id: number, position: number }[]): Promise<void> => {
+    if (!supabase) return;
+    
+    // Supabase JS client doesn't support bulk update with different values easily in one call
+    // We'll use a loop or upsert if schema allows. Loop is simpler for now given few items.
+    const promises = updates.map(update => 
+        supabase.from('admin_checklist').update({ position: update.position }).eq('id', update.id)
+    );
+    
+    await Promise.all(promises);
+};
+
+export const getAdminUserIds = async (): Promise<Record<string, number>> => {
+    if (!supabase) return {};
+    const { data, error } = await supabase
+        .from('users')
+        .select('user_id, access_code')
+        .in('access_code', ['M77m', 'Nil1', 'Tm3']);
+    
+    if (error) {
+        handleError(error, 'getAdminUserIds');
+        return {};
+    }
+    
+    const mapping: Record<string, number> = {};
+    data?.forEach(user => {
+        if(user.access_code === 'M77m') mapping['M'] = user.user_id;
+        if(user.access_code === 'Nil1') mapping['N'] = user.user_id;
+        if(user.access_code === 'Tm3') mapping['T'] = user.user_id;
+    });
+    return mapping;
+}
 
 
 // --- Ideas ---

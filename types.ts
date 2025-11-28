@@ -170,6 +170,7 @@ export interface AdminChecklistItem {
   is_done: boolean;
   is_for_today: boolean;
   position: number;
+  badge?: string; // Added badge property
 }
 
 export interface Plan {
