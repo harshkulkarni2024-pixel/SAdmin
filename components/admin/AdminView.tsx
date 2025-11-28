@@ -9,7 +9,8 @@ import ActivityLog from './ActivityLog';
 import VipManagement from './VipManagement';
 import AlgorithmNewsEditor from './AlgorithmNewsEditor'; 
 import EditorTaskManagement from './EditorTaskManagement';
-import ProductionCalendar from './ProductionCalendar'; // New Import
+import ProductionCalendar from './ProductionCalendar';
+import AdminChecklist from './AdminChecklist'; // Import
 import * as db from '../../services/dbService';
 import { useUser } from '../../contexts/UserContext';
 
@@ -18,7 +19,7 @@ interface AdminViewProps {
 }
 
 // Fix: Export AdminViewType so it can be imported by other components.
-export type AdminViewType = 'dashboard' | 'users' | 'activity' | 'vip_management' | 'algorithm_news' | 'editor_tasks' | 'production_calendar';
+export type AdminViewType = 'dashboard' | 'users' | 'activity' | 'vip_management' | 'algorithm_news' | 'editor_tasks' | 'production_calendar' | 'checklist';
 
 const AdminView: React.FC<AdminViewProps> = () => {
   const { user, logout: onLogout } = useUser();
@@ -68,7 +69,7 @@ const AdminView: React.FC<AdminViewProps> = () => {
                 setActiveView('dashboard');
                 history.replaceState({ adminView: 'dashboard' }, '', '#dashboard');
             }
-        } else if (state?.adminView && ['dashboard', 'users', 'activity', 'vip_management', 'algorithm_news', 'editor_tasks', 'production_calendar'].includes(state.adminView)) {
+        } else if (state?.adminView && ['dashboard', 'users', 'activity', 'vip_management', 'algorithm_news', 'editor_tasks', 'production_calendar', 'checklist'].includes(state.adminView)) {
             setSelectedUser(null);
             setActiveView(state.adminView as AdminViewType);
         } else {
@@ -90,7 +91,7 @@ const AdminView: React.FC<AdminViewProps> = () => {
                 setActiveView('users');
                 history.replaceState({ adminView: 'userDetails', userId }, '', `#users/${userId}`);
             }
-        } else if (['users', 'activity', 'vip_management', 'algorithm_news', 'editor_tasks', 'production_calendar'].includes(hash)) {
+        } else if (['users', 'activity', 'vip_management', 'algorithm_news', 'editor_tasks', 'production_calendar', 'checklist'].includes(hash)) {
             setActiveView(hash as AdminViewType);
             setSelectedUser(null);
             history.replaceState({ adminView: hash }, '', `#${hash}`);
@@ -175,6 +176,8 @@ const AdminView: React.FC<AdminViewProps> = () => {
         return <EditorTaskManagement />;
       case 'production_calendar':
         return <ProductionCalendar />;
+      case 'checklist':
+        return <div className="h-full"><AdminChecklist /></div>;
       case 'activity':
         return <ActivityLog />;
       default:
@@ -202,6 +205,7 @@ const AdminView: React.FC<AdminViewProps> = () => {
             <nav className="p-4 mt-4">
               <ul className="space-y-2">
                   <NavItem view="dashboard" icon="dashboard" label="داشبورد" />
+                  <NavItem view="checklist" icon="clipboard-list" label="چک‌لیست اقدامات" />
                   <NavItem view="editor_tasks" icon="video" label="مدیریت تدوین" count={notifications.tasks} />
                   <NavItem view="production_calendar" icon="calendar" label="تقویم تولید" />
                   <NavItem view="users" icon="users" label="کاربران" count={notifications.ideas}/>
