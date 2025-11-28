@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { User } from '../../types';
 import { Icon } from '../common/Icon';
@@ -51,20 +52,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
                 <p className="text-slate-400 mt-1">آمار کلی و وضعیت کاربران در یک نگاه.</p>
             </div>
 
-            {/* Admin Checklist Widget - Moved to Top */}
-            <div className="w-full h-96">
-                <div className="flex justify-between items-center mb-2 px-1">
-                    <h3 className="font-bold text-white">چک‌لیست فوری</h3>
-                    <button onClick={() => onNavigate('checklist')} className="text-sm text-violet-400 hover:text-violet-300 flex items-center">
-                        مشاهده تمام صفحه
-                        <Icon name="back" className="w-4 h-4 ml-1 rotate-180" />
-                    </button>
-                </div>
-                <div className="h-full">
-                    <AdminChecklist />
-                </div>
-            </div>
-
+            {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {cards.map((card, index) => (
                     <button 
@@ -81,6 +69,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
                 ))}
             </div>
 
+            {/* Additional Shortcuts */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                  <button onClick={() => onNavigate('vip_management')} className="bg-slate-800 p-6 rounded-xl border border-slate-700 hover:bg-slate-700/50 transition-colors flex items-center justify-between group">
                     <div className="flex items-center gap-4">
@@ -107,6 +96,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
                     </div>
                     <Icon name="back" className="w-6 h-6 text-slate-500 rotate-180" />
                 </button>
+            </div>
+
+            {/* Admin Checklist Widget - Moved to Bottom */}
+            <div className="w-full h-96">
+                <div className="flex justify-between items-center mb-2 px-1">
+                    <h3 className="font-bold text-white">چک‌لیست فوری</h3>
+                    <button onClick={() => onNavigate('checklist')} className="text-sm text-violet-400 hover:text-violet-300 flex items-center">
+                        مشاهده تمام صفحه
+                        <Icon name="back" className="w-4 h-4 ml-1 rotate-180" />
+                    </button>
+                </div>
+                <div className="h-full">
+                    <AdminChecklist />
+                </div>
             </div>
         </div>
     );

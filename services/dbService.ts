@@ -1,3 +1,4 @@
+
 import { supabase } from './supabaseClient';
 import { 
     User, PostScenario, EditorTask, Plan, Report, 
@@ -15,8 +16,15 @@ const handleError = (error: any, context: string) => {
 // --- Auth & User Management ---
 
 export const verifyAccessCode = async (code: string, isAutoLogin = false): Promise<User | null> => {
-    if (!supabase) throw new Error("Supabase client not initialized");
-    const { data, error } = await supabase
+    const client = supabase;
+    if (!client) throw new Error("Supabase client not initialized");
+    
+    // Explicitly block legacy 'Item8' code
+    if (code === 'Item8') {
+        throw new Error("این کد دسترسی دیگر معتبر نیست.");
+    }
+
+    const { data, error } = await client
         .from('users')
         .select('*')
         .eq('access_code', code)
@@ -30,8 +38,9 @@ export const verifyAccessCode = async (code: string, isAutoLogin = false): Promi
 };
 
 export const getUserById = async (userId: number): Promise<User | null> => {
-    if (!supabase) return null;
-    const { data, error } = await supabase
+    const client = supabase;
+    if (!client) return null;
+    const { data, error } = await client
         .from('users')
         .select('*')
         .eq('user_id', userId)
@@ -42,8 +51,9 @@ export const getUserById = async (userId: number): Promise<User | null> => {
 };
 
 export const getAllUsers = async (): Promise<User[]> => {
-    if (!supabase) return [];
-    const { data, error } = await supabase
+    const client = supabase;
+    if (!client) return [];
+    const { data, error } = await client
         .from('users')
         .select('*')
         .neq('role', 'admin') // Assuming admins are separated or role based
@@ -53,8 +63,9 @@ export const getAllUsers = async (): Promise<User[]> => {
 };
 
 export const getAllAdmins = async (): Promise<User[]> => {
-    if (!supabase) return [];
-    const { data, error } = await supabase
+    const client = supabase;
+    if (!client) return [];
+    const { data, error } = await client
         .from('users')
         .select('*')
         .eq('role', 'admin');
@@ -63,8 +74,9 @@ export const getAllAdmins = async (): Promise<User[]> => {
 };
 
 export const getAllEditors = async (): Promise<User[]> => {
-    if (!supabase) return [];
-    const { data, error } = await supabase
+    const client = supabase;
+    if (!client) return [];
+    const { data, error } = await client
         .from('users')
         .select('*')
         .eq('role', 'editor');
@@ -73,12 +85,13 @@ export const getAllEditors = async (): Promise<User[]> => {
 };
 
 export const addUser = async (name: string, code: string, isVip: boolean): Promise<{success: boolean, message: string}> => {
-    if (!supabase) return { success: false, message: "DB Error" };
+    const client = supabase;
+    if (!client) return { success: false, message: "DB Error" };
     // Check if code exists
     const existing = await verifyAccessCode(code, true);
     if (existing) return { success: false, message: "کد دسترسی تکراری است." };
 
-    const { error } = await supabase.from('users').insert({
+    const { error } = await client.from('users').insert({
         full_name: name,
         access_code: code,
         role: 'user',
@@ -94,8 +107,9 @@ export const addUser = async (name: string, code: string, isVip: boolean): Promi
 };
 
 export const addAdmin = async (name: string, code: string): Promise<{success: boolean, message: string}> => {
-    if (!supabase) return { success: false, message: "DB Error" };
-    const { error } = await supabase.from('users').insert({
+    const client = supabase;
+    if (!client) return { success: false, message: "DB Error" };
+    const { error } = await client.from('users').insert({
         full_name: name,
         access_code: code,
         role: 'admin',
@@ -109,8 +123,9 @@ export const addAdmin = async (name: string, code: string): Promise<{success: bo
 };
 
 export const addEditor = async (name: string, code: string): Promise<{success: boolean, message: string}> => {
-    if (!supabase) return { success: false, message: "DB Error" };
-    const { error } = await supabase.from('users').insert({
+    const client = supabase;
+    if (!client) return { success: false, message: "DB Error" };
+    const { error } = await client.from('users').insert({
         full_name: name,
         access_code: code,
         role: 'editor',
@@ -124,37 +139,43 @@ export const addEditor = async (name: string, code: string): Promise<{success: b
 };
 
 export const deleteUser = async (userId: number): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('users').delete().eq('user_id', userId);
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('users').delete().eq('user_id', userId);
     if (error) handleError(error, 'deleteUser');
 };
 
 export const updateUserInfo = async (userId: number, info: Partial<User>): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('users').update(info).eq('user_id', userId);
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('users').update(info).eq('user_id', userId);
     if (error) handleError(error, 'updateUserInfo');
 };
 
 export const updateUserUsageLimits = async (userId: number, limits: any): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('users').update(limits).eq('user_id', userId);
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('users').update(limits).eq('user_id', userId);
     if (error) handleError(error, 'updateUserUsageLimits');
 };
 
 export const updateUserTotalLimits = async (userId: number, limits: any): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('users').update(limits).eq('user_id', userId);
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('users').update(limits).eq('user_id', userId);
     if (error) handleError(error, 'updateUserTotalLimits');
 };
 
 export const updateUserVipStatus = async (userId: number, isVip: boolean): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('users').update({ is_vip: isVip }).eq('user_id', userId);
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('users').update({ is_vip: isVip }).eq('user_id', userId);
     if (error) handleError(error, 'updateUserVipStatus');
 };
 
 export const incrementUsage = async (userId: number, type: string): Promise<void> => {
-    if (!supabase) return;
+    const client = supabase;
+    if (!client) return;
     
     // Mapping type to column
     const columnMap: Record<string, string> = {
@@ -170,15 +191,16 @@ export const incrementUsage = async (userId: number, type: string): Promise<void
     const col = columnMap[type] || type;
     const current = (user as any)[col] || 0;
     
-    await supabase.from('users').update({ [col]: current + 1 }).eq('user_id', userId);
+    await client.from('users').update({ [col]: current + 1 }).eq('user_id', userId);
 };
 
 export const logActivity = async (userId: number, action: string): Promise<void> => {
-    if (!supabase) return;
+    const client = supabase;
+    if (!client) return;
     const user = await getUserById(userId);
     if (!user) return;
     
-    const { error } = await supabase.from('activity_logs').insert({
+    const { error } = await client.from('activity_logs').insert({
         user_id: userId,
         user_full_name: user.full_name,
         action,
@@ -188,8 +210,9 @@ export const logActivity = async (userId: number, action: string): Promise<void>
 };
 
 export const getActivityLogs = async (): Promise<ActivityLog[]> => {
-    if (!supabase) return [];
-    const { data, error } = await supabase.from('activity_logs').select('*').order('timestamp', { ascending: false }).limit(100);
+    const client = supabase;
+    if (!client) return [];
+    const { data, error } = await client.from('activity_logs').select('*').order('timestamp', { ascending: false }).limit(100);
     if (error) handleError(error, 'getActivityLogs');
     return data || [];
 };
@@ -197,54 +220,62 @@ export const getActivityLogs = async (): Promise<ActivityLog[]> => {
 // --- Features ---
 
 export const getStoryHistory = async (userId: number): Promise<{id: number, content: string}[]> => {
-    if (!supabase) return [];
-    const { data, error } = await supabase.from('story_history').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(10);
+    const client = supabase;
+    if (!client) return [];
+    const { data, error } = await client.from('story_history').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(10);
     if (error) handleError(error, 'getStoryHistory');
     return data?.map((d: any) => ({ id: d.id, content: d.content })) || [];
 };
 
 export const saveStoryHistory = async (userId: number, content: string): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('story_history').insert({ user_id: userId, content });
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('story_history').insert({ user_id: userId, content });
     if (error) handleError(error, 'saveStoryHistory');
 };
 
 export const getScenariosForUser = async (userId: number): Promise<PostScenario[]> => {
-    if (!supabase) return [];
-    const { data, error } = await supabase.from('post_scenarios').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+    const client = supabase;
+    if (!client) return [];
+    const { data, error } = await client.from('post_scenarios').select('*').eq('user_id', userId).order('created_at', { ascending: false });
     if (error) handleError(error, 'getScenariosForUser');
     return data || [];
 };
 
 export const getScenarioById = async (id: number): Promise<PostScenario | null> => {
-    if (!supabase) return null;
-    const { data, error } = await supabase.from('post_scenarios').select('*').eq('id', id).single();
+    const client = supabase;
+    if (!client) return null;
+    const { data, error } = await client.from('post_scenarios').select('*').eq('id', id).single();
     if (error) handleError(error, 'getScenarioById');
     return data;
 };
 
 export const addScenarioForUser = async (userId: number, number: number, content: string): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('post_scenarios').insert({ user_id: userId, scenario_number: number, content });
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('post_scenarios').insert({ user_id: userId, scenario_number: number, content });
     if (error) handleError(error, 'addScenarioForUser');
 };
 
 export const deleteScenario = async (id: number): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('post_scenarios').delete().eq('id', id);
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('post_scenarios').delete().eq('id', id);
     if (error) handleError(error, 'deleteScenario');
 };
 
 export const getCaptionsForUser = async (userId: number): Promise<Caption[]> => {
-    if (!supabase) return [];
-    const { data, error } = await supabase.from('captions').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+    const client = supabase;
+    if (!client) return [];
+    const { data, error } = await client.from('captions').select('*').eq('user_id', userId).order('created_at', { ascending: false });
     if (error) handleError(error, 'getCaptionsForUser');
     return data || [];
 };
 
 export const addCaption = async (userId: number, title: string, content: string, originalScenario: string): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('captions').insert({ 
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('captions').insert({ 
         user_id: userId, 
         title, 
         content, 
@@ -254,96 +285,111 @@ export const addCaption = async (userId: number, title: string, content: string,
 };
 
 export const getChatHistory = async (userId: number): Promise<ChatMessage[]> => {
-    if (!supabase) return [];
-    const { data, error } = await supabase.from('chat_history').select('*').eq('user_id', userId).single();
+    const client = supabase;
+    if (!client) return [];
+    const { data, error } = await client.from('chat_history').select('*').eq('user_id', userId).single();
     if (error && error.code !== 'PGRST116') handleError(error, 'getChatHistory'); // PGRST116 is no rows
     return data?.messages || [];
 };
 
 export const saveChatHistory = async (userId: number, messages: ChatMessage[]): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('chat_history').upsert({ user_id: userId, messages });
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('chat_history').upsert({ user_id: userId, messages });
     if (error) handleError(error, 'saveChatHistory');
 };
 
 export const deleteChatHistory = async (userId: number): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('chat_history').delete().eq('user_id', userId);
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('chat_history').delete().eq('user_id', userId);
     if (error) handleError(error, 'deleteChatHistory');
 };
 
 export const getIdeasForUser = async (userId: number): Promise<PostIdea[]> => {
-    if (!supabase) return [];
-    const { data, error } = await supabase.from('post_ideas').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+    const client = supabase;
+    if (!client) return [];
+    const { data, error } = await client.from('post_ideas').select('*').eq('user_id', userId).order('created_at', { ascending: false });
     if (error) handleError(error, 'getIdeasForUser');
     return data || [];
 };
 
 export const addIdeaForUser = async (userId: number, idea: string): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('post_ideas').insert({ user_id: userId, idea_text: idea });
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('post_ideas').insert({ user_id: userId, idea_text: idea });
     if (error) handleError(error, 'addIdeaForUser');
 };
 
 export const deleteIdea = async (id: number): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('post_ideas').delete().eq('id', id);
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('post_ideas').delete().eq('id', id);
     if (error) handleError(error, 'deleteIdea');
 };
 
 export const getPlansForUser = async (userId: number): Promise<Plan[]> => {
-    if (!supabase) return [];
-    const { data, error } = await supabase.from('plans').select('*').eq('user_id', userId).order('timestamp', { ascending: false });
+    const client = supabase;
+    if (!client) return [];
+    const { data, error } = await client.from('plans').select('*').eq('user_id', userId).order('timestamp', { ascending: false });
     if (error) handleError(error, 'getPlansForUser');
     return data || [];
 };
 
 export const savePlanForUser = async (userId: number, content: string): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('plans').insert({ user_id: userId, content, timestamp: new Date().toISOString() });
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('plans').insert({ user_id: userId, content, timestamp: new Date().toISOString() });
     if (error) handleError(error, 'savePlanForUser');
 };
 
 export const deletePlanById = async (id: number): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('plans').delete().eq('id', id);
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('plans').delete().eq('id', id);
     if (error) handleError(error, 'deletePlanById');
 };
 
 export const getReportsForUser = async (userId: number): Promise<Report[]> => {
-    if (!supabase) return [];
-    const { data, error } = await supabase.from('reports').select('*').eq('user_id', userId).order('timestamp', { ascending: false });
+    const client = supabase;
+    if (!client) return [];
+    const { data, error } = await client.from('reports').select('*').eq('user_id', userId).order('timestamp', { ascending: false });
     if (error) handleError(error, 'getReportsForUser');
     return data || [];
 };
 
 export const saveReportForUser = async (userId: number, content: string): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('reports').insert({ user_id: userId, content, timestamp: new Date().toISOString() });
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('reports').insert({ user_id: userId, content, timestamp: new Date().toISOString() });
     if (error) handleError(error, 'saveReportForUser');
 };
 
 export const updateReportById = async (id: number, content: string): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('reports').update({ content }).eq('id', id);
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('reports').update({ content }).eq('id', id);
     if (error) handleError(error, 'updateReportById');
 };
 
 export const deleteReportById = async (id: number): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('reports').delete().eq('id', id);
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('reports').delete().eq('id', id);
     if (error) handleError(error, 'deleteReportById');
 };
 
 export const getSubscriptionHistory = async (userId: number): Promise<SubscriptionHistory[]> => {
-    if (!supabase) return [];
-    const { data, error } = await supabase.from('subscription_history').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+    const client = supabase;
+    if (!client) return [];
+    const { data, error } = await client.from('subscription_history').select('*').eq('user_id', userId).order('created_at', { ascending: false });
     if (error) handleError(error, 'getSubscriptionHistory');
     return data || [];
 };
 
 export const extendSubscription = async (userId: number, days: number): Promise<{success: boolean, message: string}> => {
-    if (!supabase) return { success: false, message: "DB Error" };
+    const client = supabase;
+    if (!client) return { success: false, message: "DB Error" };
     // Fetch current
     const user = await getUserById(userId);
     if (!user) return { success: false, message: "User not found" };
@@ -354,7 +400,7 @@ export const extendSubscription = async (userId: number, days: number): Promise<
     startDate.setDate(startDate.getDate() + days);
     const newExpiry = startDate.toISOString();
 
-    const { error } = await supabase.from('users').update({ 
+    const { error } = await client.from('users').update({ 
         subscription_expires_at: newExpiry,
         is_subscription_expired: false 
     }).eq('user_id', userId);
@@ -362,7 +408,7 @@ export const extendSubscription = async (userId: number, days: number): Promise<
     if (error) return { success: false, message: error.message };
     
     // Log history
-    await supabase.from('subscription_history').insert({
+    await client.from('subscription_history').insert({
         user_id: userId,
         extended_for_days: days,
         new_expiry_date: newExpiry
@@ -372,35 +418,40 @@ export const extendSubscription = async (userId: number, days: number): Promise<
 };
 
 export const getCompetitorAnalysisHistory = async (userId: number): Promise<CompetitorAnalysisHistory[]> => {
-    if (!supabase) return [];
-    const { data, error } = await supabase.from('competitor_analysis').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+    const client = supabase;
+    if (!client) return [];
+    const { data, error } = await client.from('competitor_analysis').select('*').eq('user_id', userId).order('created_at', { ascending: false });
     if (error) handleError(error, 'getCompetitorAnalysisHistory');
     return data || [];
 };
 
 export const saveCompetitorAnalysisHistory = async (userId: number, data: any): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('competitor_analysis').insert({ user_id: userId, ...data });
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('competitor_analysis').insert({ user_id: userId, ...data });
     if (error) handleError(error, 'saveCompetitorAnalysisHistory');
 };
 
 export const getLatestAlgorithmNews = async (): Promise<AlgorithmNews | null> => {
-    if (!supabase) return null;
-    const { data, error } = await supabase.from('algorithm_news').select('*').order('created_at', { ascending: false }).limit(1).single();
+    const client = supabase;
+    if (!client) return null;
+    const { data, error } = await client.from('algorithm_news').select('*').order('created_at', { ascending: false }).limit(1).single();
     if (error && error.code !== 'PGRST116') handleError(error, 'getLatestAlgorithmNews');
     return data;
 };
 
 export const getAlgorithmNewsHistory = async (limit: number): Promise<AlgorithmNews[]> => {
-    if (!supabase) return [];
-    const { data, error } = await supabase.from('algorithm_news').select('*').order('created_at', { ascending: false }).limit(limit);
+    const client = supabase;
+    if (!client) return [];
+    const { data, error } = await client.from('algorithm_news').select('*').order('created_at', { ascending: false }).limit(limit);
     if (error) handleError(error, 'getAlgorithmNewsHistory');
     return data || [];
 };
 
 export const addAlgorithmNews = async (content: string): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('algorithm_news').insert({ content });
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('algorithm_news').insert({ content });
     if (error) handleError(error, 'addAlgorithmNews');
 };
 
@@ -410,13 +461,15 @@ export const getNotificationCounts = async (userId: number): Promise<any> => {
 };
 
 export const clearUserNotifications = async (type: string, userId: number): Promise<void> => {
-    if (!supabase) return;
+    const client = supabase;
+    if (!client) return;
 };
 
 export const getAdminNotificationCounts = async (): Promise<any> => {
-    if (!supabase) return { ideas: 0, logs: 0, tasks: 0 };
-    const { count: ideas } = await supabase.from('post_ideas').select('*', { count: 'exact', head: true });
-    const { count: tasks } = await supabase.from('editor_tasks').select('*', { count: 'exact', head: true }).eq('status', 'pending_assignment');
+    const client = supabase;
+    if (!client) return { ideas: 0, logs: 0, tasks: 0 };
+    const { count: ideas } = await client.from('post_ideas').select('*', { count: 'exact', head: true });
+    const { count: tasks } = await client.from('editor_tasks').select('*', { count: 'exact', head: true }).eq('status', 'pending_assignment');
     return { ideas: ideas || 0, logs: 0, tasks: tasks || 0 };
 };
 
@@ -428,8 +481,9 @@ export const clearAdminNotifications = async (type: string): Promise<void> => {
 // --- Editor Tasks ---
 
 export const createEditorTask = async (clientUserId: number, scenarioContent: string, scenarioNumber: number): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('editor_tasks').insert({
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('editor_tasks').insert({
         client_user_id: clientUserId,
         scenario_content: scenarioContent,
         scenario_number: scenarioNumber,
@@ -439,14 +493,15 @@ export const createEditorTask = async (clientUserId: number, scenarioContent: st
 };
 
 export const createManualEditorTask = async (projectName: string, scenarioContent: string, scenarioNumber: number, fileUrl?: string): Promise<void> => {
-    if (!supabase) return;
+    const client = supabase;
+    if (!client) return;
     
     let content = scenarioContent;
     if(fileUrl) {
         content += `\n\n[فایل پیوست: ${fileUrl}]`;
     }
 
-    const { error } = await supabase.from('editor_tasks').insert({
+    const { error } = await client.from('editor_tasks').insert({
         client_user_id: null,
         manual_project_name: projectName,
         scenario_content: content,
@@ -457,8 +512,9 @@ export const createManualEditorTask = async (projectName: string, scenarioConten
 };
 
 export const getEditorTasks = async (userId?: number): Promise<EditorTask[]> => {
-    if (!supabase) return [];
-    let query = supabase
+    const client = supabase;
+    if (!client) return [];
+    let query = client
         .from('editor_tasks')
         .select(`
             *,
@@ -485,144 +541,196 @@ export const getEditorTasks = async (userId?: number): Promise<EditorTask[]> => 
 };
 
 export const updateEditorTaskStatus = async (id: number, status: string, note?: string): Promise<void> => {
-    if (!supabase) return;
+    const client = supabase;
+    if (!client) return;
     const updates: any = { status };
     if (note) {
         if (status === 'issue_reported') updates.editor_note = note;
         else updates.admin_note = note;
     }
-    const { error } = await supabase.from('editor_tasks').update(updates).eq('id', id);
+    const { error } = await client.from('editor_tasks').update(updates).eq('id', id);
     if (error) handleError(error, 'updateEditorTaskStatus');
 };
 
 export const assignEditorTask = async (taskId: number, editorId: number, note?: string): Promise<void> => {
-    if (!supabase) return;
+    const client = supabase;
+    if (!client) return;
     const updates: any = { assigned_editor_id: editorId, status: 'assigned' };
     if (note) updates.admin_note = note;
-    const { error } = await supabase.from('editor_tasks').update(updates).eq('id', taskId);
+    const { error } = await client.from('editor_tasks').update(updates).eq('id', taskId);
     if (error) handleError(error, 'assignEditorTask');
 };
 
 export const uploadFile = async (file: File): Promise<string | null> => {
-    if (!supabase) return null;
+    const client = supabase;
+    if (!client) return null;
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random()}.${fileExt}`;
     const filePath = `${fileName}`;
 
-    const { error: uploadError } = await supabase.storage.from('uploads').upload(filePath, file);
+    const { error: uploadError } = await client.storage.from('uploads').upload(filePath, file);
 
     if (uploadError) {
         console.error(uploadError);
         return null;
     }
 
-    const { data } = supabase.storage.from('uploads').getPublicUrl(filePath);
+    const { data } = client.storage.from('uploads').getPublicUrl(filePath);
     return data.publicUrl;
 };
 
 // --- Production Calendar ---
 
 export const getProductionEvents = async (): Promise<ProductionEvent[]> => {
-    if (!supabase) return [];
-    const { data, error } = await supabase.from('production_events').select('*');
-    if (error) handleError(error, 'getProductionEvents');
+    const client = supabase;
+    if (!client) return [];
+    const { data, error } = await client.from('production_events').select('*').order('start_time', { ascending: true });
+    
+    if (error) {
+        handleError(error, 'getProductionEvents');
+        return [];
+    }
     return data || [];
 };
 
 export const getProductionEventsForUser = async (userName: string): Promise<ProductionEvent[]> => {
-    if (!supabase) return [];
-    const { data, error } = await supabase.from('production_events').select('*').eq('project_name', userName);
-    if (error) handleError(error, 'getProductionEventsForUser');
+    const client = supabase;
+    if (!client) return [];
+    // Note: In a real app, linking by ID is better, but current schema uses name string
+    const { data, error } = await client
+        .from('production_events')
+        .select('*')
+        .eq('project_name', userName)
+        .order('start_time', { ascending: true });
+    
+    if (error) {
+        handleError(error, 'getProductionEventsForUser');
+        return [];
+    }
     return data || [];
 };
 
-export const addProductionEvent = async (event: Partial<ProductionEvent>): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('production_events').insert(event);
+export const addProductionEvent = async (event: Omit<ProductionEvent, 'id' | 'created_at'>): Promise<void> => {
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('production_events').insert(event);
     if (error) handleError(error, 'addProductionEvent');
 };
 
 export const updateProductionEvent = async (id: number, event: Partial<ProductionEvent>): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('production_events').update(event).eq('id', id);
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('production_events').update(event).eq('id', id);
     if (error) handleError(error, 'updateProductionEvent');
 };
 
 export const deleteProductionEvent = async (id: number): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('production_events').delete().eq('id', id);
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('production_events').delete().eq('id', id);
     if (error) handleError(error, 'deleteProductionEvent');
 };
 
 // --- Admin Checklist ---
 
 export const getAdminChecklist = async (adminId: number): Promise<AdminChecklistItem[]> => {
-    if (!supabase) return [];
-    const { data, error } = await supabase
+    const client = supabase;
+    if (!client) return [];
+    const { data, error } = await client
         .from('admin_checklist')
         .select('*')
         .eq('admin_id', adminId)
         .order('position', { ascending: true })
         .order('created_at', { ascending: false });
     
-    if (error) handleError(error, 'getAdminChecklist');
+    if (error) {
+        handleError(error, 'getAdminChecklist');
+        return [];
+    }
     return data || [];
 };
 
-export const getDelegatedChecklistItems = async (creatorId: number): Promise<AdminChecklistItem[]> => {
-    if (!supabase) return [];
-    const { data, error } = await supabase
+export const getDelegatedChecklistItems = async (userId: number): Promise<AdminChecklistItem[]> => {
+    const client = supabase;
+    if (!client) return [];
+    
+    // Fetch items where I am the creator OR I am the admin (assigned to me)
+    // Filter logic will be handled in JS or more complex query if needed.
+    // Here we use OR syntax for Supabase.
+    // Query: (creator_id = userId AND admin_id != userId) OR (admin_id = userId AND creator_id != userId)
+    
+    const { data, error } = await client
         .from('admin_checklist')
         .select('*')
-        .eq('creator_id', creatorId)
-        .neq('admin_id', creatorId)
+        .or(`creator_id.eq.${userId},admin_id.eq.${userId}`)
         .order('created_at', { ascending: false });
     
-    if (error) handleError(error, 'getDelegatedChecklistItems');
-    return data || [];
+    if (error) {
+        handleError(error, 'getDelegatedChecklistItems');
+        return [];
+    }
+    
+    // Filter to ensure strictly delegated items (not self-created for self)
+    return data?.filter(item => item.creator_id !== item.admin_id) || [];
 };
 
 export const addAdminChecklistItem = async (adminId: number, title: string, isForToday: boolean, position: number, badge?: string, creatorId?: number): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('admin_checklist').insert({
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('admin_checklist').insert({
         admin_id: adminId,
         creator_id: creatorId,
         title,
         is_for_today: isForToday,
         position,
-        badge 
+        badge // Added badge support
     });
     if (error) handleError(error, 'addAdminChecklistItem');
 };
 
-export const updateAdminChecklistItem = async (id: number, updates: any): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('admin_checklist').update(updates).eq('id', id);
+export const updateAdminChecklistItem = async (itemId: number, updates: Partial<AdminChecklistItem>): Promise<void> => {
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('admin_checklist').update(updates).eq('id', itemId);
     if (error) handleError(error, 'updateAdminChecklistItem');
 };
 
-export const deleteAdminChecklistItem = async (id: number): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('admin_checklist').delete().eq('id', id);
+export const deleteAdminChecklistItem = async (itemId: number): Promise<void> => {
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('admin_checklist').delete().eq('id', itemId);
     if (error) handleError(error, 'deleteAdminChecklistItem');
 };
 
-export const updateAdminChecklistOrder = async (updates: {id: number, position: number}[]): Promise<void> => {
-    if (!supabase) return;
-    for (const update of updates) {
-        await supabase.from('admin_checklist').update({ position: update.position }).eq('id', update.id);
-    }
+export const updateAdminChecklistOrder = async (updates: { id: number, position: number }[]): Promise<void> => {
+    const client = supabase;
+    if (!client) return;
+    
+    const promises = updates.map(update => 
+        client.from('admin_checklist').update({ position: update.position }).eq('id', update.id)
+    );
+    
+    await Promise.all(promises);
 };
 
 export const getAdminUserIds = async (): Promise<Record<string, number>> => {
-    if (!supabase) return {};
-    const admins = await getAllAdmins();
+    const client = supabase;
+    if (!client) return {};
+    const { data, error } = await client
+        .from('users')
+        .select('user_id, access_code')
+        .in('access_code', ['M77m', 'Nil1', 'Tm3']);
+    
+    if (error) {
+        handleError(error, 'getAdminUserIds');
+        return {};
+    }
+    
     const mapping: Record<string, number> = {};
-    admins.forEach(a => {
-        const firstLetter = a.full_name.charAt(0).toUpperCase();
-        if (['M', 'N', 'T'].includes(firstLetter)) {
-            mapping[firstLetter] = a.user_id;
-        }
+    data?.forEach(user => {
+        if(user.access_code === 'M77m') mapping['M'] = user.user_id;
+        if(user.access_code === 'Nil1') mapping['N'] = user.user_id;
+        if(user.access_code === 'Tm3') mapping['T'] = user.user_id;
     });
     return mapping;
-};
+}

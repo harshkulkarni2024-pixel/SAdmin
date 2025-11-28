@@ -482,8 +482,8 @@ const EditorTaskManagement: React.FC = () => {
                     })}
                 </div>
                 {showAddModal && (
-                    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-                        <div className="bg-slate-800 p-6 rounded-lg max-w-md w-full border border-slate-700">
+                    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setShowAddModal(false)}>
+                        <div className="bg-slate-800 p-6 rounded-lg max-w-md w-full border border-slate-700" onClick={(e) => e.stopPropagation()}>
                             <h3 className="text-xl font-bold text-white mb-4">افزودن تدوینگر جدید</h3>
                             <div className="space-y-4">
                                 <input type="text" placeholder="نام و نام خانوادگی" value={newEditorName} onChange={e => setNewEditorName(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded p-3 text-white"/>
@@ -622,8 +622,8 @@ const EditorTaskManagement: React.FC = () => {
 
             {/* Manual Task Modal */}
             {showManualTaskModal && (
-                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-                    <div className="bg-slate-800 p-6 rounded-xl max-w-lg w-full border border-slate-700 shadow-2xl overflow-y-auto max-h-[90vh]">
+                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setShowManualTaskModal(false)}>
+                    <div className="bg-slate-800 p-6 rounded-xl max-w-lg w-full border border-slate-700 shadow-2xl overflow-y-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
                         <h3 className="text-xl font-bold text-white mb-4">افزودن سناریو / پروژه دستی</h3>
                         <div className="space-y-4">
                             <div>

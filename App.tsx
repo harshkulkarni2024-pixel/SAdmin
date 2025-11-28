@@ -61,7 +61,8 @@ const App: React.FC = () => {
         const userId = parseInt(storedUserId, 10);
         if (!isNaN(userId)) {
           try {
-            const user = await verifyAccessCode(String(userId), true);
+            // FIX: Use getUserById instead of verifyAccessCode for auto-login with ID
+            const user = await getUserById(userId);
             if (user) {
               if (user.is_subscription_expired) {
                   localStorage.removeItem('userId');

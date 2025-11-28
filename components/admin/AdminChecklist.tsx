@@ -179,118 +179,159 @@ const AdminChecklist: React.FC = () => {
 
     if (isLoading) return <div className="p-4 text-center text-slate-400">در حال بارگذاری چک‌لیست...</div>;
 
+    const renderItem = (item: AdminChecklistItem, index: number, listLength: number, isDelegatedView: boolean = false) => {
+        const creatorName = Object.keys(adminIds).find(key => adminIds[key] === item.creator_id) || '?';
+        const assigneeName = Object.keys(adminIds).find(key => adminIds[key] === item.admin_id) || '?';
+        const isIncoming = item.admin_id === user?.user_id;
+
+        return (
+            <div 
+                key={item.id}
+                className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${item.is_done ? 'bg-slate-900/30 border-slate-800 opacity-60' : 'bg-slate-800 border-slate-700 hover:border-slate-600'} group`}
+            >
+                {/* Reorder Buttons (Only for active local lists) */}
+                {!item.is_done && !isDelegatedView && (
+                    <div className="flex flex-col gap-1 -ml-1">
+                        <button 
+                            onClick={() => handleManualReorder(item, 'up')} 
+                            className={`p-0.5 text-slate-600 hover:text-white rounded ${index === 0 ? 'opacity-30 cursor-default' : ''}`}
+                            disabled={index === 0}
+                        >
+                            <Icon name="arrow-up" className="w-3 h-3" />
+                        </button>
+                        <button 
+                            onClick={() => handleManualReorder(item, 'down')} 
+                            className={`p-0.5 text-slate-600 hover:text-white rounded ${index === listLength - 1 ? 'opacity-30 cursor-default' : ''}`}
+                            disabled={index === listLength - 1}
+                        >
+                            <Icon name="arrow-down" className="w-3 h-3" />
+                        </button>
+                    </div>
+                )}
+
+                {!isDelegatedView && (
+                    <button 
+                        onClick={() => handleToggleDone(item)}
+                        className={`w-5 h-5 rounded border flex items-center justify-center transition-colors flex-shrink-0 ${item.is_done ? 'bg-green-600 border-green-600 text-white' : 'border-slate-500 hover:border-green-400 hover:bg-green-400/20'}`}
+                        title={item.is_done ? "بازگرداندن" : "انجام شد"}
+                    >
+                        {item.is_done && <Icon name="check-circle" className="w-3.5 h-3.5" />}
+                    </button>
+                )}
+
+                {/* Badge Logic */}
+                {isDelegatedView ? (
+                    <span className={`flex-shrink-0 w-6 h-6 flex items-center justify-center text-[10px] font-bold rounded-full text-white border ${isIncoming ? 'bg-orange-600 border-orange-500' : 'bg-indigo-600 border-indigo-500'}`} title={isIncoming ? `دریافتی از ${creatorName}` : `محول شده به ${assigneeName}`}>
+                        {isIncoming ? creatorName : assigneeName}
+                    </span>
+                ) : (
+                    item.badge && (
+                        <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-[10px] font-bold rounded-full bg-indigo-500 text-white" title={`Assigned`}>
+                            {item.badge}
+                        </span>
+                    )
+                )}
+
+                {editingItemId === item.id ? (
+                    <div className="flex-1 flex items-center gap-2">
+                        <input 
+                            autoFocus
+                            type="text" 
+                            value={editValue} 
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && saveEdit(item.id)}
+                            className="flex-1 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-sm text-white"
+                        />
+                        <button onClick={() => saveEdit(item.id)} className="text-green-400 hover:text-green-300"><Icon name="check-circle" className="w-5 h-5"/></button>
+                        <button onClick={() => setEditingItemId(null)} className="text-red-400 hover:text-red-300"><Icon name="x-circle" className="w-5 h-5"/></button>
+                    </div>
+                ) : (
+                    <div className="flex-1">
+                        <span className={`text-sm ${item.is_done ? 'text-slate-500 line-through' : 'text-slate-200'}`}>
+                            {item.title}
+                        </span>
+                        {isDelegatedView && (
+                            <div className="text-[10px] text-slate-500 mt-1 flex gap-2">
+                                <span>{isIncoming ? '📥 دریافتی' : '📤 ارسالی'}</span>
+                                <span>|</span>
+                                <span>وضعیت: {item.is_done ? 'انجام شده ✅' : 'در انتظار انجام ⏳'}</span>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                    {editingItemId !== item.id && !isDelegatedView && (
+                        <>
+                            <button onClick={() => startEditing(item)} className="text-slate-500 hover:text-violet-400 p-1" title="ویرایش">
+                                <Icon name="pencil" className="w-4 h-4" />
+                            </button>
+                            {!item.is_done && (
+                                <button onClick={() => handleMove(item)} className="text-slate-500 hover:text-blue-400 p-1" title="جابجایی بین لیست‌ها">
+                                    <Icon name="switch" className="w-4 h-4 rotate-90" />
+                                </button>
+                            )}
+                            <button onClick={() => handleDelete(item.id)} className="text-slate-500 hover:text-red-400 p-1" title="حذف">
+                                <Icon name="trash" className="w-4 h-4" />
+                            </button>
+                        </>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
     const renderList = () => {
         let listItems = [];
-        let isDelegatedView = false;
 
         if (activeTab === 'history') {
-            listItems = items.filter(i => i.is_done).sort((a, b) => b.id - a.id); // Newest first for history
-        } else if (activeTab === 'delegated') {
-            listItems = delegatedItems;
-            isDelegatedView = true;
-        } else {
-            const isForToday = activeTab === 'today';
-            listItems = items.filter(i => i.is_for_today === isForToday && !i.is_done).sort((a, b) => a.position - b.position);
-        }
+            listItems = items.filter(i => i.is_done).sort((a, b) => b.id - a.id);
+            return (
+                <div className="space-y-2">
+                    {listItems.length === 0 && <p className="text-center text-slate-500 py-8">تاریخچه‌ای موجود نیست.</p>}
+                    {listItems.map((item, index) => renderItem(item, index, listItems.length))}
+                </div>
+            );
+        } 
+        
+        if (activeTab === 'delegated') {
+            const incoming = delegatedItems.filter(i => i.admin_id === user?.user_id);
+            const outgoing = delegatedItems.filter(i => i.creator_id === user?.user_id);
+            
+            if (delegatedItems.length === 0) return <p className="text-center text-slate-500 py-8">موردی یافت نشد.</p>;
+
+            return (
+                <div className="space-y-6">
+                    {incoming.length > 0 && (
+                        <div>
+                            <h4 className="text-xs font-bold text-orange-400 mb-2 uppercase tracking-wider">📥 وظایف دریافتی از دیگران</h4>
+                            <div className="space-y-2">
+                                {incoming.map((item, index) => renderItem(item, index, incoming.length, true))}
+                            </div>
+                        </div>
+                    )}
+                    
+                    {outgoing.length > 0 && (
+                        <div>
+                            <h4 className="text-xs font-bold text-indigo-400 mb-2 uppercase tracking-wider">📤 وظایف محول شده به دیگران</h4>
+                            <div className="space-y-2">
+                                {outgoing.map((item, index) => renderItem(item, index, outgoing.length, true))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )
+        } 
+        
+        // Standard Tabs (Today / Others)
+        const isForToday = activeTab === 'today';
+        listItems = items.filter(i => i.is_for_today === isForToday && !i.is_done).sort((a, b) => a.position - b.position);
 
         if (listItems.length === 0) return <p className="text-center text-slate-500 py-8">موردی یافت نشد.</p>;
 
         return (
             <div className="space-y-2">
-                {listItems.map((item, index) => (
-                    <div 
-                        key={item.id}
-                        className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${item.is_done ? 'bg-slate-900/30 border-slate-800 opacity-60' : 'bg-slate-800 border-slate-700 hover:border-slate-600'} group`}
-                    >
-                        {/* Reorder Buttons (Only for active local lists) */}
-                        {!item.is_done && !isDelegatedView && (
-                            <div className="flex flex-col gap-1 -ml-1">
-                                <button 
-                                    onClick={() => handleManualReorder(item, 'up')} 
-                                    className={`p-0.5 text-slate-600 hover:text-white rounded ${index === 0 ? 'opacity-30 cursor-default' : ''}`}
-                                    disabled={index === 0}
-                                >
-                                    <Icon name="arrow-up" className="w-3 h-3" />
-                                </button>
-                                <button 
-                                    onClick={() => handleManualReorder(item, 'down')} 
-                                    className={`p-0.5 text-slate-600 hover:text-white rounded ${index === listItems.length - 1 ? 'opacity-30 cursor-default' : ''}`}
-                                    disabled={index === listItems.length - 1}
-                                >
-                                    <Icon name="arrow-down" className="w-3 h-3" />
-                                </button>
-                            </div>
-                        )}
-
-                        {!isDelegatedView && (
-                            <button 
-                                onClick={() => handleToggleDone(item)}
-                                className={`w-5 h-5 rounded border flex items-center justify-center transition-colors flex-shrink-0 ${item.is_done ? 'bg-green-600 border-green-600 text-white' : 'border-slate-500 hover:border-green-400 hover:bg-green-400/20'}`}
-                                title={item.is_done ? "بازگرداندن" : "انجام شد"}
-                            >
-                                {item.is_done && <Icon name="check-circle" className="w-3.5 h-3.5" />}
-                            </button>
-                        )}
-
-                        {/* If viewing delegated, show who it's assigned to */}
-                        {isDelegatedView && item.admin_id !== user?.user_id && (
-                             <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center text-[10px] font-bold rounded-full bg-slate-600 text-white border border-slate-500" title="محول شده به">
-                                {Object.keys(adminIds).find(key => adminIds[key] === item.admin_id) || '?'}
-                            </span>
-                        )}
-
-                        {/* If viewing own list, show who assigned it (if badge set) */}
-                        {!isDelegatedView && item.badge && (
-                            <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-[10px] font-bold rounded-full bg-indigo-500 text-white" title={`Assigned to/by ${item.badge}`}>
-                                {item.badge}
-                            </span>
-                        )}
-
-                        {editingItemId === item.id ? (
-                            <div className="flex-1 flex items-center gap-2">
-                                <input 
-                                    autoFocus
-                                    type="text" 
-                                    value={editValue} 
-                                    onChange={(e) => setEditValue(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && saveEdit(item.id)}
-                                    className="flex-1 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-sm text-white"
-                                />
-                                <button onClick={() => saveEdit(item.id)} className="text-green-400 hover:text-green-300"><Icon name="check-circle" className="w-5 h-5"/></button>
-                                <button onClick={() => setEditingItemId(null)} className="text-red-400 hover:text-red-300"><Icon name="x-circle" className="w-5 h-5"/></button>
-                            </div>
-                        ) : (
-                            <div className="flex-1">
-                                <span className={`text-sm ${item.is_done ? 'text-slate-500 line-through' : 'text-slate-200'}`}>
-                                    {item.title}
-                                </span>
-                                {isDelegatedView && (
-                                    <div className="text-[10px] text-slate-500 mt-1">
-                                        وضعیت: {item.is_done ? 'انجام شده ✅' : 'در انتظار انجام ⏳'}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                            {editingItemId !== item.id && !isDelegatedView && (
-                                <>
-                                    <button onClick={() => startEditing(item)} className="text-slate-500 hover:text-violet-400 p-1" title="ویرایش">
-                                        <Icon name="pencil" className="w-4 h-4" />
-                                    </button>
-                                    {!item.is_done && (
-                                        <button onClick={() => handleMove(item)} className="text-slate-500 hover:text-blue-400 p-1" title="جابجایی بین لیست‌ها">
-                                            <Icon name="switch" className="w-4 h-4 rotate-90" />
-                                        </button>
-                                    )}
-                                    <button onClick={() => handleDelete(item.id)} className="text-slate-500 hover:text-red-400 p-1" title="حذف">
-                                        <Icon name="trash" className="w-4 h-4" />
-                                    </button>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                ))}
+                {listItems.map((item, index) => renderItem(item, index, listItems.length))}
             </div>
         );
     };
