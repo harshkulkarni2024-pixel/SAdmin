@@ -9,6 +9,7 @@ import EditorView from './components/editor/EditorView';
 import { Loader } from './components/common/Loader';
 import { UserProvider } from './contexts/UserContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import NotificationRequest from './components/common/NotificationRequest';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -153,12 +154,17 @@ const App: React.FC = () => {
         <div className="min-h-screen bg-slate-900 text-slate-100">
           {!currentUser ? (
             <WelcomeScreen onLogin={handleLogin} error={error} setError={setError} showExpiredLink={showExpiredSubscriptionMessage} />
-          ) : currentUser.role === 'admin' ? (
-            <AdminView />
-          ) : currentUser.role === 'editor' ? (
-            <EditorView />
           ) : (
-            <UserView />
+            <>
+              {currentUser.role === 'admin' ? (
+                <AdminView />
+              ) : currentUser.role === 'editor' ? (
+                <EditorView />
+              ) : (
+                <UserView />
+              )}
+              <NotificationRequest />
+            </>
           )}
         </div>
       </UserProvider>

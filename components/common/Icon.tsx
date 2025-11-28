@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 
-type IconName = 'user' | 'users' | 'logout' | 'dashboard' | 'chat' | 'scenario' | 'caption' | 'image' | 'plan' | 'report' | 'idea' | 'broadcast' | 'back' | 'trash' | 'edit' | 'send' | 'microphone' | 'stop' | 'plus' | 'key' | 'lock-closed' | 'menu' | 'document-text' | 'chart-bar' | 'upload' | 'phone-wave' | 'crown' | 'paperclip' | 'check-circle' | 'exclamation-triangle' | 'information-circle' | 'video' | 'calendar' | 'clock' | 'coffee' | 'refresh' | 'save' | 'x-circle';
+type IconName = 'user' | 'users' | 'logout' | 'dashboard' | 'chat' | 'scenario' | 'caption' | 'image' | 'plan' | 'report' | 'idea' | 'broadcast' | 'back' | 'trash' | 'edit' | 'send' | 'microphone' | 'stop' | 'plus' | 'key' | 'lock-closed' | 'menu' | 'document-text' | 'chart-bar' | 'upload' | 'phone-wave' | 'crown' | 'paperclip' | 'check-circle' | 'exclamation-triangle' | 'information-circle' | 'video' | 'calendar' | 'clock' | 'coffee' | 'refresh' | 'save' | 'x-circle' | 'pencil' | 'arrow-up' | 'arrow-down' | 'switch' | 'history' | 'grip-vertical' | 'bell';
 
 interface IconProps {
   name: IconName;
@@ -47,6 +47,13 @@ const ICONS: Record<IconName, React.ReactNode> = {
     'refresh': <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />,
     'save': <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V7.5m-18 0l5.25-5.25h9L21 7.5m-18 0h18" />,
     'x-circle': <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />,
+    'pencil': <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />,
+    'arrow-up': <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />,
+    'arrow-down': <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />,
+    'switch': <path strokeLinecap="round" strokeLinejoin="round" d="M3 7.5L7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" />,
+    'history': <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />, // Reusing clock essentially, but semantic naming
+    'grip-vertical': <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z" />,
+    'bell': <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />,
 };
 
 export const Icon: React.FC<IconProps> = ({ name, className = 'w-6 h-6' }) => {
