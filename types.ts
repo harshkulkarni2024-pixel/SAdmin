@@ -140,8 +140,9 @@ export interface PostScenario {
 
 export interface EditorTask {
   id: number;
-  client_user_id: number;
-  client_name?: string; // Joined field
+  client_user_id: number | null; // Nullable for manual tasks
+  manual_project_name?: string; // New field for manual tasks
+  client_name?: string; // Joined field or manual name
   scenario_content: string;
   scenario_number: number;
   assigned_editor_id: number | null;
@@ -166,6 +167,7 @@ export interface ProductionEvent {
 export interface AdminChecklistItem {
   id: number;
   admin_id: number;
+  creator_id?: number; // Who created this item
   title: string;
   is_done: boolean;
   is_for_today: boolean;

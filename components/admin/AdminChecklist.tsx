@@ -10,11 +10,12 @@ const AdminChecklist: React.FC = () => {
     const { user } = useUser();
     const showNotification = useNotification();
     const [items, setItems] = useState<AdminChecklistItem[]>([]);
+    const [delegatedItems, setDelegatedItems] = useState<AdminChecklistItem[]>([]);
     const [newItemText, setNewItemText] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [editingItemId, setEditingItemId] = useState<number | null>(null);
     const [editValue, setEditValue] = useState('');
-    const [activeTab, setActiveTab] = useState<'today' | 'others' | 'history'>('today');
+    const [activeTab, setActiveTab] = useState<'today' | 'others' | 'history' | 'delegated'>('today');
     
     // Assignment Logic
     const [adminIds, setAdminIds] = useState<Record<string, number>>({});
@@ -25,6 +26,9 @@ const AdminChecklist: React.FC = () => {
         try {
             const data = await db.getAdminChecklist(user.user_id);
             setItems(data);
+            
+            const delegatedData = await db.getDelegatedChecklistItems(user.user_id);
+            setDelegatedItems(delegatedData);
         } catch (e) {
             console.error("Failed to fetch checklist", e);
         } finally {
@@ -64,7 +68,7 @@ const AdminChecklist: React.FC = () => {
             const newPos = minPos - 1;
 
             const promises = targets.map(async (target) => {
-                await db.addAdminChecklistItem(target.id, newItemText, targetIsForToday, newPos, target.badge);
+                await db.addAdminChecklistItem(target.id, newItemText, targetIsForToday, newPos, target.badge, user.user_id);
             });
 
             await Promise.all(promises);
@@ -177,8 +181,13 @@ const AdminChecklist: React.FC = () => {
 
     const renderList = () => {
         let listItems = [];
+        let isDelegatedView = false;
+
         if (activeTab === 'history') {
             listItems = items.filter(i => i.is_done).sort((a, b) => b.id - a.id); // Newest first for history
+        } else if (activeTab === 'delegated') {
+            listItems = delegatedItems;
+            isDelegatedView = true;
         } else {
             const isForToday = activeTab === 'today';
             listItems = items.filter(i => i.is_for_today === isForToday && !i.is_done).sort((a, b) => a.position - b.position);
@@ -193,8 +202,8 @@ const AdminChecklist: React.FC = () => {
                         key={item.id}
                         className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${item.is_done ? 'bg-slate-900/30 border-slate-800 opacity-60' : 'bg-slate-800 border-slate-700 hover:border-slate-600'} group`}
                     >
-                        {/* Reorder Buttons (Only for active lists) */}
-                        {!item.is_done && (
+                        {/* Reorder Buttons (Only for active local lists) */}
+                        {!item.is_done && !isDelegatedView && (
                             <div className="flex flex-col gap-1 -ml-1">
                                 <button 
                                     onClick={() => handleManualReorder(item, 'up')} 
@@ -213,16 +222,26 @@ const AdminChecklist: React.FC = () => {
                             </div>
                         )}
 
-                        <button 
-                            onClick={() => handleToggleDone(item)}
-                            className={`w-5 h-5 rounded border flex items-center justify-center transition-colors flex-shrink-0 ${item.is_done ? 'bg-green-600 border-green-600 text-white' : 'border-slate-500 hover:border-green-400 hover:bg-green-400/20'}`}
-                            title={item.is_done ? "بازگرداندن" : "انجام شد"}
-                        >
-                            {item.is_done && <Icon name="check-circle" className="w-3.5 h-3.5" />}
-                        </button>
+                        {!isDelegatedView && (
+                            <button 
+                                onClick={() => handleToggleDone(item)}
+                                className={`w-5 h-5 rounded border flex items-center justify-center transition-colors flex-shrink-0 ${item.is_done ? 'bg-green-600 border-green-600 text-white' : 'border-slate-500 hover:border-green-400 hover:bg-green-400/20'}`}
+                                title={item.is_done ? "بازگرداندن" : "انجام شد"}
+                            >
+                                {item.is_done && <Icon name="check-circle" className="w-3.5 h-3.5" />}
+                            </button>
+                        )}
 
-                        {item.badge && (
-                            <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-[10px] font-bold rounded-full bg-indigo-500 text-white" title={`Assigned to ${item.badge}`}>
+                        {/* If viewing delegated, show who it's assigned to */}
+                        {isDelegatedView && item.admin_id !== user?.user_id && (
+                             <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center text-[10px] font-bold rounded-full bg-slate-600 text-white border border-slate-500" title="محول شده به">
+                                {Object.keys(adminIds).find(key => adminIds[key] === item.admin_id) || '?'}
+                            </span>
+                        )}
+
+                        {/* If viewing own list, show who assigned it (if badge set) */}
+                        {!isDelegatedView && item.badge && (
+                            <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-[10px] font-bold rounded-full bg-indigo-500 text-white" title={`Assigned to/by ${item.badge}`}>
                                 {item.badge}
                             </span>
                         )}
@@ -241,13 +260,20 @@ const AdminChecklist: React.FC = () => {
                                 <button onClick={() => setEditingItemId(null)} className="text-red-400 hover:text-red-300"><Icon name="x-circle" className="w-5 h-5"/></button>
                             </div>
                         ) : (
-                            <span className={`flex-1 text-sm ${item.is_done ? 'text-slate-500 line-through' : 'text-slate-200'}`}>
-                                {item.title}
-                            </span>
+                            <div className="flex-1">
+                                <span className={`text-sm ${item.is_done ? 'text-slate-500 line-through' : 'text-slate-200'}`}>
+                                    {item.title}
+                                </span>
+                                {isDelegatedView && (
+                                    <div className="text-[10px] text-slate-500 mt-1">
+                                        وضعیت: {item.is_done ? 'انجام شده ✅' : 'در انتظار انجام ⏳'}
+                                    </div>
+                                )}
+                            </div>
                         )}
 
                         <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                            {editingItemId !== item.id && (
+                            {editingItemId !== item.id && !isDelegatedView && (
                                 <>
                                     <button onClick={() => startEditing(item)} className="text-slate-500 hover:text-violet-400 p-1" title="ویرایش">
                                         <Icon name="pencil" className="w-4 h-4" />
@@ -279,22 +305,28 @@ const AdminChecklist: React.FC = () => {
             </div>
             
             {/* Tabs */}
-            <div className="flex border-b border-slate-700 bg-slate-900/30">
+            <div className="flex border-b border-slate-700 bg-slate-900/30 overflow-x-auto">
                 <button 
                     onClick={() => setActiveTab('today')} 
-                    className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'today' ? 'border-violet-500 text-white' : 'border-transparent text-slate-400 hover:text-slate-300'}`}
+                    className={`flex-1 py-3 px-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'today' ? 'border-violet-500 text-white' : 'border-transparent text-slate-400 hover:text-slate-300'}`}
                 >
                     امروز
                 </button>
                 <button 
                     onClick={() => setActiveTab('others')} 
-                    className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'others' ? 'border-blue-500 text-white' : 'border-transparent text-slate-400 hover:text-slate-300'}`}
+                    className={`flex-1 py-3 px-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'others' ? 'border-blue-500 text-white' : 'border-transparent text-slate-400 hover:text-slate-300'}`}
                 >
                     سایر اقدامات
                 </button>
                 <button 
+                    onClick={() => setActiveTab('delegated')} 
+                    className={`flex-1 py-3 px-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'delegated' ? 'border-indigo-500 text-white' : 'border-transparent text-slate-400 hover:text-slate-300'}`}
+                >
+                    محول شده
+                </button>
+                <button 
                     onClick={() => setActiveTab('history')} 
-                    className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'history' ? 'border-slate-500 text-white' : 'border-transparent text-slate-400 hover:text-slate-300'}`}
+                    className={`flex-1 py-3 px-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'history' ? 'border-slate-500 text-white' : 'border-transparent text-slate-400 hover:text-slate-300'}`}
                 >
                     تاریخچه
                 </button>
@@ -302,7 +334,7 @@ const AdminChecklist: React.FC = () => {
 
             <div className="p-4 flex-1 overflow-y-auto custom-scrollbar">
                 {/* Input Area (Only for Active Tabs) */}
-                {activeTab !== 'history' && (
+                {(activeTab === 'today' || activeTab === 'others') && (
                     <div className="mb-6">
                         <div className="flex gap-2 mb-2">
                             <input 

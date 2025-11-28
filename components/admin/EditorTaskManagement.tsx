@@ -21,6 +21,15 @@ const EditorTaskManagement: React.FC = () => {
     // Filter states for Kanban
     const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'active' | 'approval' | 'delivered'>('pending');
 
+    // Manual Task Modal State
+    const [showManualTaskModal, setShowManualTaskModal] = useState(false);
+    const [manualProjectName, setManualProjectName] = useState('');
+    const [manualScenarioNum, setManualScenarioNum] = useState('');
+    const [manualContent, setManualContent] = useState('');
+    const [manualFileUrl, setManualFileUrl] = useState('');
+    const [isUploadingManual, setIsUploadingManual] = useState(false);
+    const manualFileInputRef = useRef<HTMLInputElement>(null);
+
     const fetchData = useCallback(async () => {
         setIsLoading(true);
         try {
@@ -52,13 +61,11 @@ const EditorTaskManagement: React.FC = () => {
         }
     };
     
+    // ... (handleApprove, handleReject, handleViewProfile remain same)
     const handleApprove = async (taskId: number) => {
         if(!confirm('آیا از تایید نهایی و آرشیو این پروژه اطمینان دارید؟')) return;
         try {
-            // Option A: Mark as delivered (archived)
             await db.updateEditorTaskStatus(taskId, 'delivered');
-            // Option B: Delete the task if "Archiving" means removing from DB
-            // await db.deleteEditorTask(taskId); 
             showNotification('پروژه تایید و به لیست تحویل شده‌ها منتقل شد.', 'success');
             fetchData();
         } catch (error) {
@@ -72,10 +79,7 @@ const EditorTaskManagement: React.FC = () => {
             return;
         }
         try {
-            await db.updateEditorTaskStatus(taskId, 'issue_reported', undefined); // Status back to issue/active
-            // Ideally we should append the rejection note to admin_note or a new field, here using assign to update note
-            // Assuming we can update just the note via a separate call or reusing assign logic without changing editor
-            // For simplicity reusing assign with current editor
+            await db.updateEditorTaskStatus(taskId, 'issue_reported', undefined); 
             const task = tasks.find(t => t.id === taskId);
             if (task && task.assigned_editor_id) {
                  await db.assignEditorTask(taskId, task.assigned_editor_id, `[عدم تایید]: ${note}`);
@@ -93,6 +97,39 @@ const EditorTaskManagement: React.FC = () => {
         setViewMode('profile');
     }
 
+    const handleAddManualTask = async () => {
+        if (!manualProjectName || !manualScenarioNum || !manualContent) {
+            showNotification('لطفاً نام پروژه، شماره سناریو و توضیحات را وارد کنید.', 'error');
+            return;
+        }
+        try {
+            await db.createManualEditorTask(manualProjectName, manualContent, parseInt(manualScenarioNum), manualFileUrl);
+            showNotification('تسک جدید با موفقیت ایجاد شد.', 'success');
+            setShowManualTaskModal(false);
+            setManualProjectName('');
+            setManualScenarioNum('');
+            setManualContent('');
+            setManualFileUrl('');
+            fetchData();
+        } catch (error) {
+            showNotification('خطا در ایجاد تسک.', 'error');
+        }
+    }
+
+    const handleManualFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setIsUploadingManual(true);
+        const url = await db.uploadFile(file);
+        setIsUploadingManual(false);
+        if (url) {
+            setManualFileUrl(url);
+            showNotification('فایل آپلود شد.', 'success');
+        } else {
+            showNotification('خطا در آپلود.', 'error');
+        }
+    }
+
     // --- SUB-COMPONENTS ---
 
     // 1. TASK BOARD (KANBAN)
@@ -107,6 +144,7 @@ const EditorTaskManagement: React.FC = () => {
         });
 
         const TaskCard: React.FC<{ task: EditorTask }> = ({ task }) => {
+            // ... (TaskCard implementation remains largely the same, ensure Icon syntax is correct)
             const [taskEditorId, setTaskEditorId] = useState(task.assigned_editor_id ? String(task.assigned_editor_id) : '');
             const [adminNote, setAdminNote] = useState(task.admin_note || '');
             const [isRecording, setIsRecording] = useState(false);
@@ -126,11 +164,9 @@ const EditorTaskManagement: React.FC = () => {
             const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
-                
                 setIsUploading(true);
                 const url = await db.uploadFile(file);
                 setIsUploading(false);
-                
                 if (url) {
                     setAdminNote(prev => prev + `\n[فایل پیوست: ${url}]`);
                     showNotification('فایل با موفقیت پیوست شد.', 'success');
@@ -148,16 +184,13 @@ const EditorTaskManagement: React.FC = () => {
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                     const recorder = new MediaRecorder(stream);
                     const chunks: Blob[] = [];
-                    
                     recorder.ondataavailable = (e) => chunks.push(e.data);
                     recorder.onstop = async () => {
                         const blob = new Blob(chunks, { type: 'audio/webm' });
                         const file = new File([blob], `voice_note_${Date.now()}.webm`, { type: 'audio/webm' });
-                        
                         setIsUploading(true);
                         const url = await db.uploadFile(file);
                         setIsUploading(false);
-                        
                         if (url) {
                             setAdminNote(prev => prev + `\n[ویس: ${url}]`);
                             showNotification('ویس با موفقیت پیوست شد.', 'success');
@@ -166,7 +199,6 @@ const EditorTaskManagement: React.FC = () => {
                         }
                         stream.getTracks().forEach(track => track.stop());
                     };
-                    
                     recorder.start();
                     mediaRecorderRef.current = recorder;
                     setIsRecording(true);
@@ -348,6 +380,19 @@ const EditorTaskManagement: React.FC = () => {
                     ))}
                 </div>
 
+                {/* Add Manual Task Button (Only visible in 'pending' or 'all' view) */}
+                {(filterStatus === 'pending' || filterStatus === 'all') && (
+                    <div className="mb-6">
+                        <button 
+                            onClick={() => setShowManualTaskModal(true)}
+                            className="w-full py-3 bg-slate-800 border border-dashed border-slate-600 text-slate-400 hover:border-violet-500 hover:text-violet-400 rounded-xl transition-all flex items-center justify-center gap-2"
+                        >
+                            <Icon name="plus" className="w-5 h-5" />
+                            افزودن دستی سناریو / پروژه خارج از سیستم
+                        </button>
+                    </div>
+                )}
+
                 {filteredTasks.length === 0 ? (
                     <div className="text-center py-10 bg-slate-800 rounded-lg">
                         <Icon name="video" className="w-12 h-12 mx-auto text-slate-500 mb-3"/>
@@ -362,8 +407,10 @@ const EditorTaskManagement: React.FC = () => {
         );
     }
 
-    // 2. TEAM MANAGEMENT
+    // 2. TEAM MANAGEMENT & 3. PROFILE VIEW (Keep existing code)
+    // ... (These sections remain largely the same)
     const TeamManagementView = () => {
+        // ... (Same as before)
         const [newEditorName, setNewEditorName] = useState('');
         const [newEditorCode, setNewEditorCode] = useState('');
         const [showAddModal, setShowAddModal] = useState(false);
@@ -400,7 +447,6 @@ const EditorTaskManagement: React.FC = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {editors.map(editor => {
-                        // Calculate quick stats for card
                         const editorTasks = tasks.filter(t => t.assigned_editor_id === editor.user_id);
                         const activeCount = editorTasks.filter(t => t.status === 'assigned' || t.status === 'issue_reported').length;
                         const deliveredCount = editorTasks.filter(t => t.status === 'delivered').length;
@@ -421,7 +467,6 @@ const EditorTaskManagement: React.FC = () => {
                                         </button>
                                     </div>
                                 </div>
-                                
                                 <div className="grid grid-cols-2 gap-2 mt-4">
                                     <div className="bg-slate-900/50 p-2 rounded text-center">
                                         <p className="text-xs text-slate-400">در حال انجام</p>
@@ -436,26 +481,13 @@ const EditorTaskManagement: React.FC = () => {
                         )
                     })}
                 </div>
-
                 {showAddModal && (
                     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
                         <div className="bg-slate-800 p-6 rounded-lg max-w-md w-full border border-slate-700">
                             <h3 className="text-xl font-bold text-white mb-4">افزودن تدوینگر جدید</h3>
                             <div className="space-y-4">
-                                <input 
-                                    type="text" 
-                                    placeholder="نام و نام خانوادگی" 
-                                    value={newEditorName} 
-                                    onChange={e => setNewEditorName(e.target.value)} 
-                                    className="w-full bg-slate-900 border border-slate-600 rounded p-3 text-white"
-                                />
-                                <input 
-                                    type="text" 
-                                    placeholder="کد دسترسی (انگلیسی)" 
-                                    value={newEditorCode} 
-                                    onChange={e => setNewEditorCode(e.target.value)} 
-                                    className="w-full bg-slate-900 border border-slate-600 rounded p-3 text-white font-mono dir-ltr"
-                                />
+                                <input type="text" placeholder="نام و نام خانوادگی" value={newEditorName} onChange={e => setNewEditorName(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded p-3 text-white"/>
+                                <input type="text" placeholder="کد دسترسی (انگلیسی)" value={newEditorCode} onChange={e => setNewEditorCode(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded p-3 text-white font-mono dir-ltr"/>
                                 <div className="flex gap-3 pt-2">
                                     <button onClick={() => setShowAddModal(false)} className="flex-1 bg-slate-700 text-white py-2 rounded hover:bg-slate-600">انصراف</button>
                                     <button onClick={handleAddEditor} disabled={!newEditorName || !newEditorCode} className="flex-1 bg-violet-600 text-white py-2 rounded hover:bg-violet-700 disabled:opacity-50">افزودن</button>
@@ -468,15 +500,11 @@ const EditorTaskManagement: React.FC = () => {
         );
     };
 
-    // 3. PROFILE PERFORMANCE VIEW (Same as before, just ensuring filtered logic works)
     const ProfilePerformanceView = () => {
+        // ... (Same as before)
         const [timeRange, setTimeRange] = useState<'week' | 'month' | 'all'>('all');
-        
         if (!selectedEditor) return null;
-
         const editorTasks = tasks.filter(t => t.assigned_editor_id === selectedEditor.user_id);
-        
-        // Filter by time range
         const filteredHistory = editorTasks.filter(task => {
             if (timeRange === 'all') return true;
             const taskDate = new Date(task.updated_at);
@@ -484,8 +512,6 @@ const EditorTaskManagement: React.FC = () => {
             const diffDays = (now.getTime() - taskDate.getTime()) / (1000 * 3600 * 24);
             return timeRange === 'week' ? diffDays <= 7 : diffDays <= 30;
         });
-
-        // Calculate Stats
         const totalAssigned = filteredHistory.length;
         const delivered = filteredHistory.filter(t => t.status === 'delivered').length;
         const issues = filteredHistory.filter(t => t.status === 'issue_reported').length;
@@ -494,32 +520,19 @@ const EditorTaskManagement: React.FC = () => {
         return (
             <div className="animate-fade-in">
                 <button onClick={() => { setSelectedEditor(null); setViewMode('team'); }} className="flex items-center text-slate-400 hover:text-white mb-6">
-                    <Icon name="back" className="w-5 h-5 me-2"/>
-                    بازگشت به لیست تیم
+                    <Icon name="back" className="w-5 h-5 me-2"/>بازگشت به لیست تیم
                 </button>
-
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                     <div>
                         <h2 className="text-3xl font-bold text-white">{selectedEditor.full_name}</h2>
                         <p className="text-slate-400 mt-1 font-mono">کد دسترسی: {selectedEditor.access_code}</p>
                     </div>
                     <div className="bg-slate-800 p-1 rounded-lg inline-flex">
-                        {[
-                            { k: 'week', l: '۷ روز اخیر' }, 
-                            { k: 'month', l: '۳۰ روز اخیر' }, 
-                            { k: 'all', l: 'کل تاریخچه' }
-                        ].map(opt => (
-                            <button 
-                                key={opt.k}
-                                onClick={() => setTimeRange(opt.k as any)}
-                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${timeRange === opt.k ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                            >
-                                {opt.l}
-                            </button>
+                        {[{ k: 'week', l: '۷ روز اخیر' }, { k: 'month', l: '۳۰ روز اخیر' }, { k: 'all', l: 'کل تاریخچه' }].map(opt => (
+                            <button key={opt.k} onClick={() => setTimeRange(opt.k as any)} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${timeRange === opt.k ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white'}`}>{opt.l}</button>
                         ))}
                     </div>
                 </div>
-
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                     <div className="bg-slate-800 p-5 rounded-xl border border-slate-700">
                         <p className="text-slate-400 text-sm mb-1">تعداد کل پروژه‌ها</p>
@@ -538,7 +551,6 @@ const EditorTaskManagement: React.FC = () => {
                         <p className="text-2xl font-bold text-red-400">{issues}</p>
                     </div>
                 </div>
-
                 <div className="bg-slate-800 rounded-xl overflow-hidden border border-slate-700">
                     <div className="p-4 border-b border-slate-700 bg-slate-900/50">
                         <h3 className="font-bold text-white">تاریخچه فعالیت‌ها</h3>
@@ -565,14 +577,8 @@ const EditorTaskManagement: React.FC = () => {
                                             <td className="p-4">{new Date(task.created_at).toLocaleDateString('fa-IR')}</td>
                                             <td className="p-4">{new Date(task.updated_at).toLocaleDateString('fa-IR')}</td>
                                             <td className="p-4">
-                                                <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                                                    task.status === 'delivered' ? 'bg-green-900/30 text-green-400' :
-                                                    task.status === 'issue_reported' ? 'bg-red-900/30 text-red-400' :
-                                                    'bg-yellow-900/30 text-yellow-400'
-                                                }`}>
-                                                    {task.status === 'delivered' ? 'تحویل شده' : 
-                                                     task.status === 'issue_reported' ? 'دارای مشکل' : 
-                                                     task.status === 'pending_approval' ? 'منتظر تایید' : 'در حال انجام'}
+                                                <span className={`px-2 py-1 rounded-full text-xs font-bold ${task.status === 'delivered' ? 'bg-green-900/30 text-green-400' : task.status === 'issue_reported' ? 'bg-red-900/30 text-red-400' : 'bg-yellow-900/30 text-yellow-400'}`}>
+                                                    {task.status === 'delivered' ? 'تحویل شده' : task.status === 'issue_reported' ? 'دارای مشکل' : task.status === 'pending_approval' ? 'منتظر تایید' : 'در حال انجام'}
                                                 </span>
                                             </td>
                                         </tr>
@@ -613,6 +619,67 @@ const EditorTaskManagement: React.FC = () => {
             {viewMode === 'kanban' && <TaskBoardView />}
             {viewMode === 'team' && <TeamManagementView />}
             {viewMode === 'profile' && <ProfilePerformanceView />}
+
+            {/* Manual Task Modal */}
+            {showManualTaskModal && (
+                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+                    <div className="bg-slate-800 p-6 rounded-xl max-w-lg w-full border border-slate-700 shadow-2xl overflow-y-auto max-h-[90vh]">
+                        <h3 className="text-xl font-bold text-white mb-4">افزودن سناریو / پروژه دستی</h3>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm text-slate-400 mb-1">نام پروژه / کارفرما</label>
+                                <input 
+                                    type="text" 
+                                    value={manualProjectName} 
+                                    onChange={e => setManualProjectName(e.target.value)} 
+                                    className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white"
+                                    placeholder="مثلاً: پروژه شرکت ایکس"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm text-slate-400 mb-1">شماره سناریو</label>
+                                <input 
+                                    type="number" 
+                                    value={manualScenarioNum} 
+                                    onChange={e => setManualScenarioNum(e.target.value)} 
+                                    className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white"
+                                    placeholder="1"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm text-slate-400 mb-1">متن سناریو / توضیحات</label>
+                                <textarea 
+                                    value={manualContent} 
+                                    onChange={e => setManualContent(e.target.value)} 
+                                    className="w-full h-32 bg-slate-900 border border-slate-600 rounded p-2 text-white"
+                                    placeholder="متن کامل سناریو یا توضیحات پروژه..."
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm text-slate-400 mb-1">پیوست فایل (اختیاری)</label>
+                                <div className="flex items-center gap-2">
+                                    <input type="file" ref={manualFileInputRef} className="hidden" onChange={handleManualFileUpload} />
+                                    <button 
+                                        onClick={() => manualFileInputRef.current?.click()} 
+                                        disabled={isUploadingManual}
+                                        className="bg-slate-700 hover:bg-slate-600 text-slate-300 px-4 py-2 rounded flex items-center gap-2"
+                                    >
+                                        <Icon name="paperclip" className="w-4 h-4"/>
+                                        انتخاب فایل / ویس
+                                    </button>
+                                    {isUploadingManual && <span className="text-xs text-violet-400 animate-pulse">در حال آپلود...</span>}
+                                    {manualFileUrl && <span className="text-xs text-green-400">فایل آپلود شد ✅</span>}
+                                </div>
+                            </div>
+                            
+                            <div className="flex gap-3 pt-4">
+                                <button onClick={() => setShowManualTaskModal(false)} className="flex-1 bg-slate-700 text-white py-2 rounded hover:bg-slate-600">انصراف</button>
+                                <button onClick={handleAddManualTask} disabled={!manualProjectName || !manualScenarioNum || !manualContent || isUploadingManual} className="flex-1 bg-violet-600 text-white py-2 rounded hover:bg-violet-700 disabled:opacity-50">ثبت پروژه</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
