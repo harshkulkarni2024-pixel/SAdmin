@@ -20,9 +20,6 @@ const AdminChecklist: React.FC = () => {
     const [adminIds, setAdminIds] = useState<Record<string, number>>({});
     const [assignments, setAssignments] = useState<{ M: boolean, N: boolean, T: boolean }>({ M: false, N: false, T: false });
 
-    // DnD State
-    const [draggedItem, setDraggedItem] = useState<AdminChecklistItem | null>(null);
-
     const fetchItems = useCallback(async () => {
         if (!user) return;
         try {
@@ -84,17 +81,22 @@ const AdminChecklist: React.FC = () => {
 
     const handleToggleDone = async (item: AdminChecklistItem) => {
         try {
-            // Optimistic Update
+            // Optimistic Update: Immediately move to done (history) visually
             const newIsDone = !item.is_done;
             setItems(prev => prev.map(i => i.id === item.id ? { ...i, is_done: newIsDone } : i));
+            
             await db.updateAdminChecklistItem(item.id, { is_done: newIsDone });
             
-            if (!newIsDone) {
+            if (newIsDone) {
+                // Was not done, now is done -> Move to history
+                // No extra notification needed for seamless flow, maybe a small one
+            } else {
+                // Was done, now is not done -> Move back to active list
                 showNotification('اقدام به لیست فعال بازگشت.', 'info');
             }
         } catch (e) {
             showNotification('خطا در بروزرسانی', 'error');
-            fetchItems();
+            fetchItems(); // Revert on error
         }
     };
 
@@ -128,6 +130,7 @@ const AdminChecklist: React.FC = () => {
     const handleMove = async (item: AdminChecklistItem) => {
         try {
             const newIsForToday = !item.is_for_today;
+            // Optimistic update
             setItems(prev => prev.map(i => i.id === item.id ? { ...i, is_for_today: newIsForToday } : i));
             await db.updateAdminChecklistItem(item.id, { is_for_today: newIsForToday });
         } catch (e) {
@@ -140,9 +143,8 @@ const AdminChecklist: React.FC = () => {
         setAssignments(prev => ({ ...prev, [key]: !prev[key] }));
     }
 
-    // --- Reordering Logic ---
-
     const handleManualReorder = async (item: AdminChecklistItem, direction: 'up' | 'down') => {
+        // Filter list based on the item's current section (Today or Later)
         const currentList = items
             .filter(i => i.is_for_today === item.is_for_today && !i.is_done)
             .sort((a, b) => a.position - b.position);
@@ -151,11 +153,14 @@ const AdminChecklist: React.FC = () => {
         if (currentIndex === -1) return;
 
         const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+
+        // Boundary checks
         if (targetIndex < 0 || targetIndex >= currentList.length) return;
 
         const targetItem = currentList[targetIndex];
 
-        // Swap
+        // Swap positions in local state for immediate feedback
+        // We actually need to swap their position values
         const newItems = items.map(p => {
             if (p.id === item.id) return { ...p, position: targetItem.position };
             if (p.id === targetItem.id) return { ...p, position: item.position };
@@ -164,57 +169,19 @@ const AdminChecklist: React.FC = () => {
         
         setItems(newItems);
 
-        try {
-            await db.updateAdminChecklistOrder([
-                { id: item.id, position: targetItem.position },
-                { id: targetItem.id, position: item.position }
-            ]);
-        } catch (e) {
-            console.error("Reorder failed", e);
-            fetchItems();
-        }
-    };
-
-    const handleDragStart = (e: React.DragEvent, item: AdminChecklistItem) => {
-        setDraggedItem(item);
-        e.dataTransfer.effectAllowed = 'move';
-        // Optional: Set a drag image or styling
-    };
-
-    const handleDragOver = (e: React.DragEvent, targetItem: AdminChecklistItem) => {
-        e.preventDefault(); // Necessary to allow dropping
-        if (!draggedItem || draggedItem.id === targetItem.id) return;
-        if (draggedItem.is_for_today !== targetItem.is_for_today) return; // Prevent dragging between lists for now
-    };
-
-    const handleDrop = async (e: React.DragEvent, targetItem: AdminChecklistItem) => {
-        e.preventDefault();
-        if (!draggedItem || draggedItem.id === targetItem.id) return;
-        if (draggedItem.is_for_today !== targetItem.is_for_today) return;
-
-        // Perform swap logic similar to manual reorder but maybe insert?
-        // Simple swap for now to keep logic consistent with manual reorder
+        // Update DB
         const updates = [
-            { id: draggedItem.id, position: targetItem.position },
-            { id: targetItem.id, position: draggedItem.position }
+            { id: item.id, position: targetItem.position },
+            { id: targetItem.id, position: item.position }
         ];
-
-        const newItems = items.map(p => {
-            if (p.id === draggedItem.id) return { ...p, position: targetItem.position };
-            if (p.id === targetItem.id) return { ...p, position: draggedItem.position };
-            return p;
-        });
-
-        setItems(newItems);
-        setDraggedItem(null);
 
         try {
             await db.updateAdminChecklistOrder(updates);
         } catch (e) {
-            fetchItems();
+            console.error("Reorder failed", e);
+            fetchItems(); // Revert on error
         }
     };
-
 
     const renderListSection = (title: string, isForToday: boolean, colorClass: string, dotColor: string) => {
         const listItems = items
@@ -233,13 +200,9 @@ const AdminChecklist: React.FC = () => {
                     {listItems.map((item, index) => (
                         <div 
                             key={item.id}
-                            draggable
-                            onDragStart={(e) => handleDragStart(e, item)}
-                            onDragOver={(e) => handleDragOver(e, item)}
-                            onDrop={(e) => handleDrop(e, item)}
-                            className={`flex items-center gap-3 p-3 rounded-lg border transition-all bg-slate-800 border-slate-700 hover:border-slate-600 group ${draggedItem?.id === item.id ? 'opacity-50 border-dashed border-slate-500' : ''}`}
+                            className="flex items-center gap-3 p-3 rounded-lg border transition-all bg-slate-800 border-slate-700 hover:border-slate-600 group"
                         >
-                            {/* Reorder Buttons */}
+                            {/* Reorder Buttons (Mobile Friendly) */}
                             <div className="flex flex-col gap-1 -ml-1">
                                 <button 
                                     onClick={() => handleManualReorder(item, 'up')} 
@@ -284,7 +247,7 @@ const AdminChecklist: React.FC = () => {
                                     <button onClick={() => setEditingItemId(null)} className="text-red-400 hover:text-red-300"><Icon name="x-circle" className="w-5 h-5"/></button>
                                 </div>
                             ) : (
-                                <span className="flex-1 text-sm text-slate-200 cursor-grab active:cursor-grabbing">
+                                <span className="flex-1 text-sm text-slate-200">
                                     {item.title}
                                 </span>
                             )}
