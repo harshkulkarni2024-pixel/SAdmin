@@ -22,8 +22,8 @@ export const verifyAccessCode = async (code: string, isSessionLogin: boolean = f
         throw new Error(SUPABASE_INIT_ERROR);
     }
 
-    // Security Block for Legacy Admin
-    if (code === 'Item8' || code === 'item8') {
+    // Security Block for Legacy Admin - STRICT CHECK
+    if (code && (code.toLowerCase() === 'item8')) {
         throw new Error('این کد دسترسی منقضی و غیرفعال شده است.');
     }
 
@@ -642,8 +642,6 @@ export const deleteAdminChecklistItem = async (itemId: number): Promise<void> =>
 export const updateAdminChecklistOrder = async (updates: { id: number, position: number }[]): Promise<void> => {
     if (!supabase) return;
     
-    // Supabase JS client doesn't support bulk update with different values easily in one call
-    // We'll use a loop or upsert if schema allows. Loop is simpler for now given few items.
     const promises = updates.map(update => 
         supabase.from('admin_checklist').update({ position: update.position }).eq('id', update.id)
     );
