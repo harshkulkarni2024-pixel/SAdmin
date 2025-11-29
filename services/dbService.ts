@@ -53,11 +53,11 @@ export const getUserById = async (userId: number): Promise<User | null> => {
 export const getAllUsers = async (): Promise<User[]> => {
     const client = supabase;
     if (!client) return [];
-    // Strict filter: Exclude admins, managers, and editors
+    // Strict filter: Only fetch 'user' role. This ensures admins and editors never appear in the user list.
     const { data, error } = await client
         .from('users')
         .select('*')
-        .not('role', 'in', '("admin","manager","editor")') 
+        .eq('role', 'user') 
         .order('user_id', { ascending: false });
     if (error) handleError(error, 'getAllUsers');
     return data || [];
