@@ -84,10 +84,8 @@ const UserManagement: React.FC<UserManagementProps> = ({ onSelectUser }) => {
   };
   
   const handleDeleteAdmin = async (adminId: number) => {
-      if (!isManager) {
-          showNotification('فقط مدیر اصلی دسترسی حذف مدیران را دارد.', 'error');
-          return;
-      }
+      if (!isManager) return; // Strict check
+      
       if (window.confirm('آیا از حذف این مدیر اطمینان دارید؟')) {
           await db.deleteUser(adminId);
           showNotification('مدیر با موفقیت حذف شد.', 'success');
@@ -101,8 +99,8 @@ const UserManagement: React.FC<UserManagementProps> = ({ onSelectUser }) => {
          <h1 className="text-3xl font-bold text-white">مدیریت کاربران</h1>
          {isManager && (
              <div className="bg-slate-800 p-1 rounded-lg flex">
-                 <button onClick={() => setActiveTab('users')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'users' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white'}`}>کاربران عادی</button>
-                 <button onClick={() => setActiveTab('admins')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'admins' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white'}`}>مدیران</button>
+                 <button onClick={() => setActiveTab('users')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'users' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white'}`}>کاربران</button>
+                 <button onClick={() => setActiveTab('admins')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'admins' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white'}`}>ادمین‌ها</button>
              </div>
          )}
          {activeTab === 'users' ? (
@@ -171,7 +169,9 @@ const UserManagement: React.FC<UserManagementProps> = ({ onSelectUser }) => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">{admin.access_code}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-left text-sm font-medium">
-                        <button onClick={() => handleDeleteAdmin(admin.user_id)} className="text-red-500 hover:text-red-400">حذف</button>
+                        {isManager && (
+                            <button onClick={() => handleDeleteAdmin(admin.user_id)} className="text-red-500 hover:text-red-400">حذف</button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -181,7 +181,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onSelectUser }) => {
           </div>
       )}
 
-      {/* Modals */}
+      {/* Modals remain the same... */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowAddModal(false)}>
           <div className="bg-slate-800 p-8 rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>

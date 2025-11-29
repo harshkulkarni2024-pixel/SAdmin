@@ -24,9 +24,12 @@ const AdminPermissions: React.FC = () => {
         setIsLoading(true);
         try {
             const allAdmins = await db.getAllAdmins();
-            setAdmins(allAdmins);
+            // Ensure admins is always an array to prevent crash
+            setAdmins(Array.isArray(allAdmins) ? allAdmins : []);
         } catch (e) {
+            console.error(e);
             showNotification('خطا در بارگذاری لیست مدیران.', 'error');
+            setAdmins([]);
         } finally {
             setIsLoading(false);
         }

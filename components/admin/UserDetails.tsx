@@ -102,11 +102,13 @@ const UserDetails: React.FC<UserDetailsProps> = ({ user, onBack, onUpdate }) => 
             setAbout(freshUser.about_info || '');
             setPreferredName(freshUser.preferred_name || '');
             setAccessCode(freshUser.access_code || ''); // Update access code
-            setPlans(await db.getPlansForUser(freshUser.user_id));
-            setReports(await db.getReportsForUser(freshUser.user_id));
-            setScenarios(await db.getScenariosForUser(freshUser.user_id));
-            setIdeas(await db.getIdeasForUser(freshUser.user_id));
-            setSubscriptionHistory(await db.getSubscriptionHistory(freshUser.user_id));
+            
+            // Safe loading of data to prevent whole page crash
+            try { setPlans(await db.getPlansForUser(freshUser.user_id)); } catch (e) { console.error("Plans error", e); }
+            try { setReports(await db.getReportsForUser(freshUser.user_id)); } catch (e) { console.error("Reports error", e); }
+            try { setScenarios(await db.getScenariosForUser(freshUser.user_id)); } catch (e) { console.error("Scenarios error", e); }
+            try { setIdeas(await db.getIdeasForUser(freshUser.user_id)); } catch (e) { console.error("Ideas error", e); }
+            try { setSubscriptionHistory(await db.getSubscriptionHistory(freshUser.user_id)); } catch (e) { console.error("Sub history error", e); }
 
             setUsageLimits({
                 story_requests: freshUser.story_requests,
@@ -378,7 +380,6 @@ const UserDetails: React.FC<UserDetailsProps> = ({ user, onBack, onUpdate }) => 
                         </div>
                     </div>
                 );
-            // ... (Other cases like 'reports', 'subscription', 'scenarios', 'ideas', 'limits' remain exactly the same as previous file but are omitted here for brevity if allowed, otherwise I would paste them all. Assuming I need to return full file content)
             case 'reports':
                 const ReportForm: React.FC<{ isEditing: boolean }> = ({ isEditing }) => {
                     const inputs = isEditing ? editingReportInputs : reportInputs;

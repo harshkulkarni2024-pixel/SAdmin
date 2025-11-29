@@ -12,13 +12,13 @@ interface AdminDashboardProps {
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
     const { user } = useUser();
     
-    // Define all potential menu items
+    // Define all potential menu items with Short Names
     const allMenuItems = [
-        { id: 'checklist', label: 'چک‌لیست', icon: 'clipboard-list', color: 'text-violet-400', bg: 'bg-violet-500/20' },
-        { id: 'production_calendar', label: 'تقویم تولید', icon: 'calendar', color: 'text-sky-400', bg: 'bg-sky-500/20' },
-        { id: 'editor_tasks', label: 'مدیریت تدوین', icon: 'video', color: 'text-purple-400', bg: 'bg-purple-500/20' },
-        { id: 'users', label: 'مدیریت کاربران', icon: 'users', color: 'text-blue-400', bg: 'bg-blue-500/20' },
-        { id: 'algorithm_news', label: 'اخبار الگوریتم', icon: 'broadcast', color: 'text-pink-400', bg: 'bg-pink-500/20' },
+        { id: 'checklist', label: 'اقدام', icon: 'clipboard-list', color: 'text-violet-400', bg: 'bg-violet-500/20' },
+        { id: 'production_calendar', label: 'تقویم', icon: 'calendar', color: 'text-sky-400', bg: 'bg-sky-500/20' },
+        { id: 'editor_tasks', label: 'تدوین', icon: 'video', color: 'text-purple-400', bg: 'bg-purple-500/20' },
+        { id: 'users', label: 'کاربر', icon: 'users', color: 'text-blue-400', bg: 'bg-blue-500/20' },
+        { id: 'algorithm_news', label: 'اخبار', icon: 'broadcast', color: 'text-pink-400', bg: 'bg-pink-500/20' },
     ];
 
     // Filter items based on permissions
@@ -26,7 +26,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
     const menuItems = allMenuItems.filter(item => {
         if (isManager) return true;
         const perms = (user?.permissions as string[]) || [];
-        // Checklist is usually basic, but let's check
         if (item.id === 'checklist') return true; 
         return perms.includes(item.id);
     });
