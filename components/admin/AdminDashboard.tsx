@@ -10,28 +10,34 @@ interface AdminDashboardProps {
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
     
+    // Removed 'vip_management' and 'activity' as requested
     const menuItems = [
-        { id: 'checklist', label: 'چک‌لیست (تمام صفحه)', icon: 'clipboard-list', color: 'text-violet-400', bg: 'bg-violet-500/20' },
+        { id: 'checklist', label: 'چک‌لیست', icon: 'clipboard-list', color: 'text-violet-400', bg: 'bg-violet-500/20' },
         { id: 'production_calendar', label: 'تقویم تولید', icon: 'calendar', color: 'text-sky-400', bg: 'bg-sky-500/20' },
         { id: 'editor_tasks', label: 'مدیریت تدوین', icon: 'video', color: 'text-purple-400', bg: 'bg-purple-500/20' },
         { id: 'users', label: 'مدیریت کاربران', icon: 'users', color: 'text-blue-400', bg: 'bg-blue-500/20' },
-        { id: 'vip_management', label: 'مدیریت VIP', icon: 'key', color: 'text-amber-400', bg: 'bg-amber-500/20' },
         { id: 'algorithm_news', label: 'اخبار الگوریتم', icon: 'broadcast', color: 'text-pink-400', bg: 'bg-pink-500/20' },
-        { id: 'activity', label: 'گزارش فعالیت‌ها', icon: 'document-text', color: 'text-emerald-400', bg: 'bg-emerald-500/20' },
     ];
 
     return (
         <div className="animate-fade-in flex flex-col h-[calc(100vh-6rem)] pb-2 gap-4">
             
-            {/* 1. Main Checklist Section (Dominant) */}
-            <div className="flex-1 min-h-0">
-                <AdminChecklist />
+            {/* 1. Main Checklist Section (Full Screen / 2x Size) */}
+            <div className="flex-1 min-h-0 bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden shadow-xl flex flex-col">
+                 <div className="px-4 py-3 bg-slate-900/50 border-b border-slate-700 flex justify-between items-center flex-shrink-0">
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                        <Icon name="clipboard-list" className="w-6 h-6 text-violet-400"/>
+                        چک‌لیست اقدامات مدیریتی
+                    </h2>
+                </div>
+                <div className="flex-1 overflow-hidden p-1">
+                    <AdminChecklist />
+                </div>
             </div>
 
-            {/* 2. Quick Access Grid (Compact) */}
+            {/* 2. Quick Access Grid (Compact & Minimal) */}
             <div className="flex-shrink-0">
-                <h3 className="text-white font-bold text-sm mb-2 px-1 opacity-80">دسترسی سریع</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
+                <div className="grid grid-cols-5 gap-3">
                     {menuItems.map((item) => (
                         <button 
                             key={item.id}

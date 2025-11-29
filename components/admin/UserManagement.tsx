@@ -13,7 +13,7 @@ interface UserManagementProps {
 const SUPER_ADMIN_CODE = 'M77m';
 
 const UserManagement: React.FC<UserManagementProps> = ({ onSelectUser }) => {
-  const { user: currentUser, logout: onLogout } = useUser();
+  const { user: currentUser } = useUser();
   const showNotification = useNotification();
   const [users, setUsers] = useState<User[]>([]);
   const [admins, setAdmins] = useState<User[]>([]);
@@ -81,14 +81,6 @@ const UserManagement: React.FC<UserManagementProps> = ({ onSelectUser }) => {
       }
   };
   
-  const handleDeleteUser = async (userId: number) => {
-      if (window.confirm('آیا از حذف این کاربر و تمام اطلاعات او مطمئن هستید؟ این عمل غیرقابل بازگشت است.')) {
-          await db.deleteUser(userId);
-          showNotification('کاربر با موفقیت حذف شد.', 'success');
-          refreshData();
-      }
-  }
-
   const handleDeleteAdmin = async (adminId: number) => {
       if (!isSuperAdmin) {
           showNotification('فقط مدیر اصلی دسترسی حذف مدیران را دارد.', 'error');
@@ -130,28 +122,25 @@ const UserManagement: React.FC<UserManagementProps> = ({ onSelectUser }) => {
           <table className="min-w-full divide-y divide-slate-700 text-right">
             <thead className="bg-slate-900/50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-xs font-medium text-slate-300 uppercase tracking-wider">نام</th>
-                <th scope="col" className="px-6 py-3 text-xs font-medium text-slate-300 uppercase tracking-wider">کد دسترسی</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">عملیات</th>
+                <th scope="col" className="px-6 py-3 text-xs font-medium text-slate-300 uppercase tracking-wider">نام کاربر</th>
+                {/* Access Code Column Removed */}
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider w-24">عملیات</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700">
               {users.map(user => (
-                <tr key={user.user_id} className="hover:bg-slate-700/50">
+                <tr key={user.user_id} className="hover:bg-slate-700/50 cursor-pointer" onClick={() => onSelectUser(user)}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
                     <div className="flex items-center">
                       <span>{user.full_name}</span>
                       {user.is_vip && (
-                        <span className="ms-2 text-xs bg-violet-600 text-white font-bold px-1.5 py-0.5 rounded-md shadow-lg shadow-violet-500/50 animate-pulse">VIP</span>
+                        <span className="ms-2 text-xs bg-violet-600 text-white font-bold px-1.5 py-0.5 rounded-md shadow-lg shadow-violet-500/50">VIP</span>
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">{user.access_code}</td>
+                  {/* Access Code Cell Removed */}
                   <td className="px-6 py-4 whitespace-nowrap text-left text-sm font-medium">
-                    <div className="flex justify-end items-center gap-4">
-                        <button onClick={() => handleDeleteUser(user.user_id)} className="text-red-500 hover:text-red-400">حذف</button>
-                        <button onClick={() => onSelectUser(user)} className="text-violet-400 hover:text-violet-300">مدیریت</button>
-                    </div>
+                    <button onClick={(e) => { e.stopPropagation(); onSelectUser(user); }} className="text-violet-400 hover:text-violet-300 px-3 py-1 rounded border border-slate-600 hover:bg-slate-700 transition-colors">مدیریت</button>
                   </td>
                 </tr>
               ))}
@@ -196,6 +185,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onSelectUser }) => {
           </div>
       )}
 
+      {/* Modals remain the same... */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
           <div className="bg-slate-800 p-8 rounded-lg shadow-xl w-full max-w-md">
