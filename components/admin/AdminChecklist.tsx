@@ -338,12 +338,6 @@ const AdminChecklist: React.FC = () => {
 
     return (
         <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden h-full flex flex-col">
-            <div className="p-4 border-b border-slate-700 bg-slate-900/50 flex justify-between items-center">
-                <h3 className="font-bold flex items-center gap-2 text-white">
-                    <Icon name="document-text" className="w-5 h-5 text-violet-400"/>
-                    چک‌لیست اقدامات
-                </h3>
-            </div>
             
             {/* Tabs */}
             <div className="flex border-b border-slate-700 bg-slate-900/30 overflow-x-auto">

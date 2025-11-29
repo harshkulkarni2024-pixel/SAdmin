@@ -53,10 +53,11 @@ export const getUserById = async (userId: number): Promise<User | null> => {
 export const getAllUsers = async (): Promise<User[]> => {
     const client = supabase;
     if (!client) return [];
+    // Strict filter: Exclude admins, managers, and editors
     const { data, error } = await client
         .from('users')
         .select('*')
-        .neq('role', 'admin') // Assuming admins are separated or role based
+        .not('role', 'in', '("admin","manager","editor")') 
         .order('user_id', { ascending: false });
     if (error) handleError(error, 'getAllUsers');
     return data || [];
@@ -65,6 +66,8 @@ export const getAllUsers = async (): Promise<User[]> => {
 export const getAllAdmins = async (): Promise<User[]> => {
     const client = supabase;
     if (!client) return [];
+    // Get admins (managers excluded usually, or included if you want to show manager in list)
+    // Here we show 'admin' role. Manager is usually handled separately or is one specific user.
     const { data, error } = await client
         .from('users')
         .select('*')
@@ -116,6 +119,7 @@ export const addAdmin = async (name: string, code: string): Promise<{success: bo
         is_verified: true,
         story_requests: 0,
         chat_messages: 0,
+        permissions: [], // Default no permissions
         last_request_date: new Date().toISOString()
     });
     if (error) return { success: false, message: error.message };
@@ -151,6 +155,14 @@ export const updateUserInfo = async (userId: number, info: Partial<User>): Promi
     const { error } = await client.from('users').update(info).eq('user_id', userId);
     if (error) handleError(error, 'updateUserInfo');
 };
+
+export const updateUserPermissions = async (userId: number, permissions: string[]): Promise<void> => {
+    const client = supabase;
+    if (!client) return;
+    // Store as jsonb
+    const { error } = await client.from('users').update({ permissions }).eq('user_id', userId);
+    if (error) handleError(error, 'updateUserPermissions');
+}
 
 export const updateUserUsageLimits = async (userId: number, limits: any): Promise<void> => {
     const client = supabase;
@@ -654,11 +666,6 @@ export const getDelegatedChecklistItems = async (userId: number): Promise<AdminC
     const client = supabase;
     if (!client) return [];
     
-    // Fetch items where I am the creator OR I am the admin (assigned to me)
-    // Filter logic will be handled in JS or more complex query if needed.
-    // Here we use OR syntax for Supabase.
-    // Query: (creator_id = userId AND admin_id != userId) OR (admin_id = userId AND creator_id != userId)
-    
     const { data, error } = await client
         .from('admin_checklist')
         .select('*')
@@ -719,7 +726,7 @@ export const getAdminUserIds = async (): Promise<Record<string, number>> => {
     const { data, error } = await client
         .from('users')
         .select('user_id, access_code')
-        .in('access_code', ['M77m', 'Nil1', 'Tm3']);
+        .in('role', ['admin', 'manager']); // Fetch all admins and managers
     
     if (error) {
         handleError(error, 'getAdminUserIds');
@@ -728,6 +735,7 @@ export const getAdminUserIds = async (): Promise<Record<string, number>> => {
     
     const mapping: Record<string, number> = {};
     data?.forEach(user => {
+        // Map access codes to IDs for easier assignment logic
         if(user.access_code === 'M77m') mapping['M'] = user.user_id;
         if(user.access_code === 'Nil1') mapping['N'] = user.user_id;
         if(user.access_code === 'Tm3') mapping['T'] = user.user_id;
