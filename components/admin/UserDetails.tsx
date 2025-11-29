@@ -48,6 +48,7 @@ const UserDetails: React.FC<UserDetailsProps> = ({ user, onBack, onUpdate }) => 
     // About Tab
     const [about, setAbout] = useState(user.about_info || '');
     const [preferredName, setPreferredName] = useState(user.preferred_name || '');
+    const [accessCode, setAccessCode] = useState(user.access_code || ''); // Added access code state
     
     // Plans Tab
     const [plans, setPlans] = useState<Plan[]>([]);
@@ -100,11 +101,14 @@ const UserDetails: React.FC<UserDetailsProps> = ({ user, onBack, onUpdate }) => 
             setCurrentUser(freshUser);
             setAbout(freshUser.about_info || '');
             setPreferredName(freshUser.preferred_name || '');
-            setPlans(await db.getPlansForUser(freshUser.user_id));
-            setReports(await db.getReportsForUser(freshUser.user_id));
-            setScenarios(await db.getScenariosForUser(freshUser.user_id));
-            setIdeas(await db.getIdeasForUser(freshUser.user_id));
-            setSubscriptionHistory(await db.getSubscriptionHistory(freshUser.user_id));
+            setAccessCode(freshUser.access_code || ''); // Update access code
+            
+            // Safe loading of data to prevent whole page crash
+            try { setPlans(await db.getPlansForUser(freshUser.user_id)); } catch (e) { console.error("Plans error", e); }
+            try { setReports(await db.getReportsForUser(freshUser.user_id)); } catch (e) { console.error("Reports error", e); }
+            try { setScenarios(await db.getScenariosForUser(freshUser.user_id)); } catch (e) { console.error("Scenarios error", e); }
+            try { setIdeas(await db.getIdeasForUser(freshUser.user_id)); } catch (e) { console.error("Ideas error", e); }
+            try { setSubscriptionHistory(await db.getSubscriptionHistory(freshUser.user_id)); } catch (e) { console.error("Sub history error", e); }
 
             setUsageLimits({
                 story_requests: freshUser.story_requests,
@@ -137,11 +141,26 @@ const UserDetails: React.FC<UserDetailsProps> = ({ user, onBack, onUpdate }) => 
     
     const handleSaveAbout = async () => {
         try {
-            await db.updateUserInfo(user.user_id, { about_info: about, preferred_name: preferredName });
+            await db.updateUserInfo(user.user_id, { 
+                about_info: about, 
+                preferred_name: preferredName,
+                access_code: accessCode 
+            });
             showNotification('اطلاعات کاربر با موفقیت ذخیره شد.');
             refreshData(currentUser);
         } catch(e) {
             showNotification((e as Error).message);
+        }
+    };
+
+    const handleDeleteUser = async () => {
+        if (window.confirm('هشدار: آیا از حذف کامل این کاربر و تمام اطلاعات او مطمئن هستید؟ این عمل غیرقابل بازگشت است.')) {
+            try {
+                await db.deleteUser(user.user_id);
+                onBack(); // Go back to list immediately
+            } catch (e) {
+                showNotification(`خطا در حذف کاربر: ${(e as Error).message}`);
+            }
         }
     };
     
@@ -165,6 +184,7 @@ const UserDetails: React.FC<UserDetailsProps> = ({ user, onBack, onUpdate }) => 
         }
     };
 
+    // ... (Other handlers: handleExtendSubscription, calculateRemainingDays, handleAddPlan, etc. remain the same)
     const handleExtendSubscription = async () => {
         const days = parseInt(extensionDays, 10);
         if (isNaN(days) || days <= 0) {
@@ -261,12 +281,10 @@ const UserDetails: React.FC<UserDetailsProps> = ({ user, onBack, onUpdate }) => 
     }
     
     const handleDeleteScenario = async (id: number) => {
-        // Updated logic: Behave like user "Recorded" button
         if (window.confirm('آیا مطمئن هستید؟ این سناریو تایید شده و برای تدوین ارسال خواهد شد (مشابه دکمه "ضبط کردم" کاربر).')) {
             const scenarioToDelete = scenarios.find(s => s.id === id);
             if (scenarioToDelete) {
                 try {
-                    // 1. Try Generate Caption (Non-blocking)
                     try {
                         const captionContent = await generateCaption(user.about_info || '', scenarioToDelete.content);
                         if (captionContent && !captionContent.includes("Error") && captionContent.trim()) {
@@ -275,15 +293,9 @@ const UserDetails: React.FC<UserDetailsProps> = ({ user, onBack, onUpdate }) => 
                         }
                     } catch (error) {
                         console.error("Caption generation failed during admin delete:", error);
-                        // Continue despite caption failure
                     } 
-                    
-                    // 2. Create Editor Task (Critical step)
                     await db.createEditorTask(user.user_id, scenarioToDelete.content, scenarioToDelete.scenario_number);
-
-                    // 3. Delete Scenario
                     await db.deleteScenario(id);
-                    
                     await db.logActivity(user.user_id, `سناریوی شماره ${scenarioToDelete.scenario_number} توسط مدیر تایید و به لیست تدوین اضافه شد.`);
                     
                     showNotification('سناریو برای تدوین ارسال شد.');
@@ -320,17 +332,27 @@ const UserDetails: React.FC<UserDetailsProps> = ({ user, onBack, onUpdate }) => 
                 return (
                      <div>
                         <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-300 mb-1">کد دسترسی (نام کاربری)</label>
+                                    <input type="text" value={accessCode} onChange={(e) => setAccessCode(e.target.value)} className="w-full bg-slate-900 p-2 rounded text-violet-300 font-mono" placeholder="کد دسترسی" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-300 mb-1">نام مورد خطاب (برای گفتگو)</label>
+                                    <input type="text" value={preferredName} onChange={(e) => setPreferredName(e.target.value)} className="w-full bg-slate-900 p-2 rounded" placeholder="مثلا: مجتبی" />
+                                </div>
+                            </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-300 mb-1">درباره کاربر (برای سناریوها)</label>
                                 <textarea value={about} onChange={(e) => setAbout(e.target.value)} className="w-full h-40 bg-slate-900 p-2 rounded" placeholder="اطلاعات کسب‌وکار کاربر، حوزه فعالیت و..."></textarea>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-300 mb-1">نام مورد خطاب (برای گفتگو)</label>
-                                <input type="text" value={preferredName} onChange={(e) => setPreferredName(e.target.value)} className="w-full bg-slate-900 p-2 rounded" placeholder="مثلا: مجتبی" />
-                            </div>
                         </div>
-                        <div className="mt-4">
-                            <button onClick={handleSaveAbout} className="bg-violet-600 px-4 py-2 rounded hover:bg-violet-700">ذخیره تغییرات</button>
+                        <div className="mt-6 flex justify-between items-center border-t border-slate-700 pt-4">
+                            <button onClick={handleDeleteUser} className="text-red-500 hover:text-red-400 text-sm flex items-center gap-2 px-3 py-2 rounded hover:bg-red-900/20 transition-colors">
+                                <Icon name="trash" className="w-4 h-4" />
+                                حذف کامل کاربر
+                            </button>
+                            <button onClick={handleSaveAbout} className="bg-violet-600 px-6 py-2 rounded hover:bg-violet-700 text-white font-medium">ذخیره تغییرات</button>
                         </div>
                     </div>
                 );

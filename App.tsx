@@ -157,7 +157,8 @@ const App: React.FC = () => {
             <WelcomeScreen onLogin={handleLogin} error={error} setError={setError} showExpiredLink={showExpiredSubscriptionMessage} />
           ) : (
             <>
-              {currentUser.role === 'admin' ? (
+              {/* FIX: Check for both 'admin' AND 'manager' roles */}
+              {currentUser.role === 'admin' || currentUser.role === 'manager' ? (
                 <AdminView />
               ) : currentUser.role === 'editor' ? (
                 <EditorView />

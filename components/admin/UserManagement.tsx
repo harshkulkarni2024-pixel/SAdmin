@@ -10,10 +10,8 @@ interface UserManagementProps {
   onSelectUser: (user: User) => void;
 }
 
-const SUPER_ADMIN_CODE = 'M77m';
-
 const UserManagement: React.FC<UserManagementProps> = ({ onSelectUser }) => {
-  const { user: currentUser, logout: onLogout } = useUser();
+  const { user: currentUser } = useUser();
   const showNotification = useNotification();
   const [users, setUsers] = useState<User[]>([]);
   const [admins, setAdmins] = useState<User[]>([]);
@@ -24,18 +22,22 @@ const UserManagement: React.FC<UserManagementProps> = ({ onSelectUser }) => {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'users' | 'admins'>('users');
 
-  const isSuperAdmin = currentUser?.access_code === SUPER_ADMIN_CODE;
+  // Only 'manager' can see/manage admins
+  const isManager = currentUser?.role === 'manager';
 
   const refreshData = useCallback(async () => {
     try {
       const allUsers = await db.getAllUsers();
-      const allAdmins = await db.getAllAdmins();
       setUsers(allUsers);
-      setAdmins(allAdmins);
+      
+      if (isManager) {
+          const allAdmins = await db.getAllAdmins();
+          setAdmins(allAdmins);
+      }
     } catch (e) {
       showNotification((e as Error).message, 'error');
     }
-  }, [showNotification]);
+  }, [showNotification, isManager]);
 
   useEffect(() => {
     refreshData();
@@ -61,7 +63,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onSelectUser }) => {
   };
 
   const handleAddAdmin = async () => {
-      if (!isSuperAdmin) {
+      if (!isManager) {
           showNotification('فقط مدیر اصلی دسترسی افزودن مدیر را دارد.', 'error');
           return;
       }
@@ -81,19 +83,9 @@ const UserManagement: React.FC<UserManagementProps> = ({ onSelectUser }) => {
       }
   };
   
-  const handleDeleteUser = async (userId: number) => {
-      if (window.confirm('آیا از حذف این کاربر و تمام اطلاعات او مطمئن هستید؟ این عمل غیرقابل بازگشت است.')) {
-          await db.deleteUser(userId);
-          showNotification('کاربر با موفقیت حذف شد.', 'success');
-          refreshData();
-      }
-  }
-
   const handleDeleteAdmin = async (adminId: number) => {
-      if (!isSuperAdmin) {
-          showNotification('فقط مدیر اصلی دسترسی حذف مدیران را دارد.', 'error');
-          return;
-      }
+      if (!isManager) return; // Strict check
+      
       if (window.confirm('آیا از حذف این مدیر اطمینان دارید؟')) {
           await db.deleteUser(adminId);
           showNotification('مدیر با موفقیت حذف شد.', 'success');
@@ -105,17 +97,19 @@ const UserManagement: React.FC<UserManagementProps> = ({ onSelectUser }) => {
     <div className="animate-fade-in">
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
          <h1 className="text-3xl font-bold text-white">مدیریت کاربران</h1>
-         <div className="bg-slate-800 p-1 rounded-lg flex">
-             <button onClick={() => setActiveTab('users')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'users' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white'}`}>کاربران عادی</button>
-             <button onClick={() => setActiveTab('admins')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'admins' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white'}`}>مدیران</button>
-         </div>
+         {isManager && (
+             <div className="bg-slate-800 p-1 rounded-lg flex">
+                 <button onClick={() => setActiveTab('users')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'users' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white'}`}>کاربران</button>
+                 <button onClick={() => setActiveTab('admins')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'admins' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white'}`}>ادمین‌ها</button>
+             </div>
+         )}
          {activeTab === 'users' ? (
             <button onClick={() => setShowAddModal(true)} className="flex items-center bg-violet-600 text-white px-4 py-2 rounded-lg hover:bg-violet-700 transition-colors">
             <Icon name="plus" className="w-5 h-5 me-2" />
             افزودن کاربر
             </button>
          ) : (
-            isSuperAdmin && (
+            isManager && (
                 <button onClick={() => setShowAddAdminModal(true)} className="flex items-center bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors">
                 <Icon name="plus" className="w-5 h-5 me-2" />
                 افزودن مدیر
@@ -130,28 +124,23 @@ const UserManagement: React.FC<UserManagementProps> = ({ onSelectUser }) => {
           <table className="min-w-full divide-y divide-slate-700 text-right">
             <thead className="bg-slate-900/50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-xs font-medium text-slate-300 uppercase tracking-wider">نام</th>
-                <th scope="col" className="px-6 py-3 text-xs font-medium text-slate-300 uppercase tracking-wider">کد دسترسی</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">عملیات</th>
+                <th scope="col" className="px-6 py-3 text-xs font-medium text-slate-300 uppercase tracking-wider">نام کاربر</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider w-24">عملیات</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700">
               {users.map(user => (
-                <tr key={user.user_id} className="hover:bg-slate-700/50">
+                <tr key={user.user_id} className="hover:bg-slate-700/50 cursor-pointer" onClick={() => onSelectUser(user)}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
                     <div className="flex items-center">
                       <span>{user.full_name}</span>
                       {user.is_vip && (
-                        <span className="ms-2 text-xs bg-violet-600 text-white font-bold px-1.5 py-0.5 rounded-md shadow-lg shadow-violet-500/50 animate-pulse">VIP</span>
+                        <span className="ms-2 text-xs bg-violet-600 text-white font-bold px-1.5 py-0.5 rounded-md shadow-lg shadow-violet-500/50">VIP</span>
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">{user.access_code}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-left text-sm font-medium">
-                    <div className="flex justify-end items-center gap-4">
-                        <button onClick={() => handleDeleteUser(user.user_id)} className="text-red-500 hover:text-red-400">حذف</button>
-                        <button onClick={() => onSelectUser(user)} className="text-violet-400 hover:text-violet-300">مدیریت</button>
-                    </div>
+                    <button onClick={(e) => { e.stopPropagation(); onSelectUser(user); }} className="text-violet-400 hover:text-violet-300 px-3 py-1 rounded border border-slate-600 hover:bg-slate-700 transition-colors">مدیریت</button>
                   </td>
                 </tr>
               ))}
@@ -161,9 +150,8 @@ const UserManagement: React.FC<UserManagementProps> = ({ onSelectUser }) => {
       </div>
       )}
 
-      {activeTab === 'admins' && (
+      {activeTab === 'admins' && isManager && (
           <div className="bg-slate-800 rounded-lg">
-            {isSuperAdmin ? (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-700 text-right">
                 <thead className="bg-slate-900/50">
@@ -177,11 +165,11 @@ const UserManagement: React.FC<UserManagementProps> = ({ onSelectUser }) => {
                   {admins.map(admin => (
                     <tr key={admin.user_id} className="hover:bg-slate-700/50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
-                          {admin.full_name} {admin.access_code === SUPER_ADMIN_CODE && <span className="text-xs text-yellow-400 bg-yellow-900/30 px-2 py-0.5 rounded ml-2">اصلی</span>}
+                          {admin.full_name}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">{admin.access_code}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-left text-sm font-medium">
-                        {admin.access_code !== SUPER_ADMIN_CODE && (
+                        {isManager && (
                             <button onClick={() => handleDeleteAdmin(admin.user_id)} className="text-red-500 hover:text-red-400">حذف</button>
                         )}
                       </td>
@@ -190,15 +178,13 @@ const UserManagement: React.FC<UserManagementProps> = ({ onSelectUser }) => {
                 </tbody>
               </table>
             </div>
-            ) : (
-                <p className="p-8 text-center text-slate-400">شما دسترسی مشاهده و ویرایش لیست مدیران را ندارید.</p>
-            )}
           </div>
       )}
 
+      {/* Modals remain the same... */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-slate-800 p-8 rounded-lg shadow-xl w-full max-w-md">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowAddModal(false)}>
+          <div className="bg-slate-800 p-8 rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
             <h2 className="text-2xl font-bold mb-4">افزودن کاربر جدید</h2>
              {error && <p className="text-red-400 mb-4 whitespace-pre-line">{error}</p>}
             <div className="space-y-4">
@@ -226,8 +212,8 @@ const UserManagement: React.FC<UserManagementProps> = ({ onSelectUser }) => {
       )}
 
       {showAddAdminModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-slate-800 p-8 rounded-lg shadow-xl w-full max-w-md border border-emerald-700/50">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowAddAdminModal(false)}>
+          <div className="bg-slate-800 p-8 rounded-lg shadow-xl w-full max-w-md border border-emerald-700/50" onClick={e => e.stopPropagation()}>
             <h2 className="text-2xl font-bold mb-4 text-emerald-400">افزودن مدیر جدید</h2>
              {error && <p className="text-red-400 mb-4 whitespace-pre-line">{error}</p>}
             <div className="space-y-4">

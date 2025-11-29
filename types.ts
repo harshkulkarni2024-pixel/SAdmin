@@ -14,11 +14,6 @@ declare global {
   }
 
   // Fix: Manually define Web Speech API types to resolve compilation errors.
-  // Note: The types for the Web Speech API (SpeechRecognition, SpeechRecognitionEvent, etc.)
-  // are manually defined here to ensure compatibility, as the `@types/dom-speech-recognition`
-  // package may not be picked up correctly in all environments.
-
-  // Added specific types to resolve conflicts with other global definitions.
   type SpeechRecognitionErrorCode =
     | 'no-speech'
     | 'aborted'
@@ -107,7 +102,8 @@ export interface User {
   full_name: string;
   access_code: string;
   is_verified: boolean;
-  role?: 'user' | 'admin' | 'editor'; // Added role
+  role?: 'user' | 'admin' | 'editor' | 'manager'; // Added manager role
+  permissions?: string[]; // Array of allowed view keys for admins
   about_info?: string;
   preferred_name?: string; 
   story_requests: number;        
