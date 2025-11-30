@@ -49,6 +49,8 @@ export const generateStoryImageContent = async (userText: string, imageBase64: s
     ];
 
     try {
+        console.log("Sending request to GapGPT:", `${GAPGPT_BASE_URL}/chat/completions`);
+        
         const response = await fetch(`${GAPGPT_BASE_URL}/chat/completions`, {
             method: 'POST',
             headers: {
@@ -64,14 +66,41 @@ export const generateStoryImageContent = async (userText: string, imageBase64: s
 
         if (!response.ok) {
             const errorText = await response.text();
-            throw new Error(`خطای سرویس (${response.status}): ${errorText}`);
+            let errorMessage = `خطای سمت سرور (${response.status})`;
+            try {
+                const errorJson = JSON.parse(errorText);
+                if (errorJson.error && errorJson.error.message) {
+                    errorMessage += `: ${errorJson.error.message}`;
+                } else {
+                    errorMessage += `: ${errorText}`;
+                }
+            } catch (e) {
+                errorMessage += `: ${errorText}`;
+            }
+            throw new Error(errorMessage);
         }
 
         const data: GapGptResponse = await response.json();
+        if (!data.choices || data.choices.length === 0 || !data.choices[0].message) {
+            throw new Error("پاسخ نامعتبر از سرویس هوش مصنوعی (ساختار JSON صحیح نیست).");
+        }
         return data.choices[0].message.content;
 
     } catch (error) {
         console.error("GapGPT Service Error:", error);
+        
+        // Handle "Failed to fetch" specifically
+        if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+            throw new Error(`خطای ارتباط با سرور (Failed to fetch). 
+            
+دلایل احتمالی:
+1. مشکل اینترنت یا VPN (لطفاً VPN را تغییر دهید یا خاموش کنید).
+2. مشکل CORS: مرورگر اجازه درخواست مستقیم به آدرس ${GAPGPT_BASE_URL} را نمی‌دهد.
+3. آدرس API اشتباه وارد شده است.
+
+اگر توسعه‌دهنده هستید: کنسول مرورگر (F12) را برای جزئیات دقیق‌تر بررسی کنید.`);
+        }
+
         throw error;
     }
 };

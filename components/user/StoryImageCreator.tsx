@@ -14,6 +14,7 @@ const StoryImageCreator: React.FC = () => {
     const [uploadedImage, setUploadedImage] = useState<{ data: string; mime: string; url: string; } | null>(null);
     const [result, setResult] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [detailedError, setDetailedError] = useState<string | null>(null); // New state for error
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -27,6 +28,7 @@ const StoryImageCreator: React.FC = () => {
                     mime: file.type,
                     url: URL.createObjectURL(file)
                 });
+                setDetailedError(null); // Clear previous errors
             };
             reader.readAsDataURL(file);
         }
@@ -34,6 +36,9 @@ const StoryImageCreator: React.FC = () => {
 
     const handleGenerate = async () => {
         if (!user) return;
+        setDetailedError(null);
+        setResult('');
+
         if (!uploadedImage || !text.trim()) {
             showNotification('لطفاً هم عکس و هم متن را وارد کنید.', 'error');
             return;
@@ -48,7 +53,6 @@ const StoryImageCreator: React.FC = () => {
         }
 
         setIsLoading(true);
-        setResult('');
 
         try {
             const content = await generateStoryImageContent(text, uploadedImage.data, uploadedImage.mime);
@@ -60,7 +64,9 @@ const StoryImageCreator: React.FC = () => {
             showNotification('استوری با موفقیت طراحی شد!', 'success');
 
         } catch (error) {
-            showNotification(`خطا: ${(error as Error).message}`, 'error');
+            const msg = (error as Error).message;
+            setDetailedError(msg); // Show detail on screen
+            showNotification('خطا در ارتباط با هوش مصنوعی', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -82,6 +88,19 @@ const StoryImageCreator: React.FC = () => {
 
             <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 mb-8">
                 <div className="space-y-6">
+                    {/* Error Display Box */}
+                    {detailedError && (
+                        <div className="bg-red-900/50 border border-red-500 rounded-lg p-4 mb-4 animate-shake">
+                            <div className="flex items-start gap-3">
+                                <Icon name="exclamation-triangle" className="w-6 h-6 text-red-400 flex-shrink-0 mt-1" />
+                                <div>
+                                    <h4 className="font-bold text-red-200 mb-1">خطا در پردازش درخواست</h4>
+                                    <p className="text-sm text-red-100 whitespace-pre-line leading-relaxed">{detailedError}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Image Upload */}
                     <div 
                         className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer transition-colors ${uploadedImage ? 'border-violet-500 bg-violet-500/10' : 'border-slate-600 hover:border-slate-500 hover:bg-slate-700/30'}`}
