@@ -13,7 +13,10 @@ export default defineConfig({
     'process.env.LIARA_API_KEY': JSON.stringify(process.env.LIARA_API_KEY),
     'process.env.LIARA_BASE_URL': JSON.stringify(process.env.LIARA_BASE_URL),
     'process.env.SUPABASE_URL': JSON.stringify(process.env.SUPABASE_URL),
-    'process.env.SUPABASE_ANON_KEY': JSON.stringify(process.env.SUPABASE_ANON_KEY)
+    'process.env.SUPABASE_ANON_KEY': JSON.stringify(process.env.SUPABASE_ANON_KEY),
+    'process.env.BOX_API_KEY': JSON.stringify(process.env.BOX_API_KEY),
+    'process.env.GAPGPT_API_KEY': JSON.stringify(process.env.GAPGPT_API_KEY),
+    'process.env.GAPGPT_BASE_URL': JSON.stringify(process.env.GAPGPT_BASE_URL)
   },
   build: {
     emptyOutDir: true

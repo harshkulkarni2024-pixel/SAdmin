@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { PostScenario } from '../../types';
 import { Icon } from '../common/Icon';
@@ -174,6 +175,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ setActiveView }) => {
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-4">
           <DashboardCard title="سناریو استوری" icon="scenario" onClick={() => handleCardClick('story')} />
+          <DashboardCard title="ساخت استوری تصویری" icon="sparkles" onClick={() => handleCardClick('story_image')} />
           <DashboardCard title="کپشن‌ها" icon="caption" onClick={() => handleCardClick('caption')} />
           <DashboardCard title="تحلیل رقبا" icon="chart-bar" onClick={() => handleCardClick('competitor_analysis')} />
           <DashboardCard title="اخبار الگوریتم" icon="broadcast" onClick={() => handleCardClick('algorithm_news')} />

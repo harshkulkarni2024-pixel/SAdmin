@@ -1,4 +1,3 @@
-
 import { supabase } from './supabaseClient';
 import { 
     User, PostScenario, EditorTask, Plan, Report, 
@@ -71,7 +70,7 @@ export const getAllAdmins = async (): Promise<User[]> => {
     const { data, error } = await client
         .from('users')
         .select('*')
-        .eq('role', 'admin');
+        .in('role', ['admin', 'manager']);
     if (error) handleError(error, 'getAllAdmins');
     return data || [];
 };
@@ -194,7 +193,8 @@ export const incrementUsage = async (userId: number, type: string): Promise<void
         'story': 'story_requests',
         'caption_idea': 'caption_idea_requests',
         'chat': 'chat_messages',
-        'competitor_analysis': 'caption_idea_requests' 
+        'competitor_analysis': 'caption_idea_requests', // Sharing limit for now
+        'image_generation': 'image_generation_requests'
     };
     
     const user = await getUserById(userId);
@@ -229,167 +229,276 @@ export const getActivityLogs = async (): Promise<ActivityLog[]> => {
     return data || [];
 };
 
-// --- Features ---
+// --- Notifications & Counts ---
 
-export const getStoryHistory = async (userId: number): Promise<{id: number, content: string}[]> => {
+export const getAdminNotificationCounts = async () => {
+    const client = supabase;
+    if (!client) return { ideas: 0, logs: 0, tasks: 0 };
+    
+    // Count exact rows
+    const { count: ideasCount } = await client.from('post_ideas').select('*', { count: 'exact', head: true });
+    const { count: logsCount } = await client.from('activity_logs').select('*', { count: 'exact', head: true });
+    const { count: tasksCount } = await client.from('editor_tasks').select('*', { count: 'exact', head: true }).eq('status', 'pending_assignment');
+    
+    return { 
+        ideas: ideasCount || 0, 
+        logs: logsCount || 0, 
+        tasks: tasksCount || 0 
+    };
+};
+
+export const getNotificationCounts = async (userId: number) => {
+    const client = supabase;
+    if (!client) return { scenarios: 0, plans: 0, reports: 0 };
+    
+    const { count: scenarios } = await client.from('post_scenarios').select('*', { count: 'exact', head: true }).eq('user_id', userId);
+    const { count: plans } = await client.from('plans').select('*', { count: 'exact', head: true }).eq('user_id', userId);
+    const { count: reports } = await client.from('reports').select('*', { count: 'exact', head: true }).eq('user_id', userId);
+
+    return { 
+        scenarios: scenarios || 0, 
+        plans: plans || 0, 
+        reports: reports || 0 
+    };
+};
+
+export const clearUserNotifications = async (type: string, userId: number) => {
+    // Placeholder for clearing notifications logic
+};
+
+export const clearAdminNotifications = async (type: string) => {
+    // Placeholder for clearing notifications logic
+};
+
+// --- Story History ---
+
+export const getStoryHistory = async (userId: number): Promise<{ id: number; content: string }[]> => {
     const client = supabase;
     if (!client) return [];
-    const { data, error } = await client.from('story_history').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(10);
-    if (error) handleError(error, 'getStoryHistory');
-    return data?.map((d: any) => ({ id: d.id, content: d.content })) || [];
+    const { data, error } = await client
+        .from('story_history')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+    
+    if (error) {
+        // Suppress error if table doesn't exist yet to avoid app crash
+        console.warn("getStoryHistory warning:", error.message);
+        return [];
+    }
+    
+    return data.map((item: any) => ({
+        id: new Date(item.created_at).getTime(), 
+        content: item.content
+    }));
 };
 
-export const saveStoryHistory = async (userId: number, content: string): Promise<void> => {
+export const saveStoryHistory = async (userId: number, content: string) => {
     const client = supabase;
     if (!client) return;
-    const { error } = await client.from('story_history').insert({ user_id: userId, content });
+    const { error } = await client.from('story_history').insert({
+        user_id: userId,
+        content: content
+    });
     if (error) handleError(error, 'saveStoryHistory');
 };
+
+// --- Post Scenarios ---
 
 export const getScenariosForUser = async (userId: number): Promise<PostScenario[]> => {
     const client = supabase;
     if (!client) return [];
-    const { data, error } = await client.from('post_scenarios').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+    const { data, error } = await client
+        .from('post_scenarios')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+    
     if (error) handleError(error, 'getScenariosForUser');
-    return data || [];
+    
+    return data?.map((item: any) => ({
+        ...item,
+        id: item.id,
+        timestamp: item.created_at
+    })) || [];
 };
 
 export const getScenarioById = async (id: number): Promise<PostScenario | null> => {
     const client = supabase;
     if (!client) return null;
     const { data, error } = await client.from('post_scenarios').select('*').eq('id', id).single();
-    if (error) handleError(error, 'getScenarioById');
+    if (error) return null;
     return data;
 };
 
-export const addScenarioForUser = async (userId: number, number: number, content: string): Promise<void> => {
+export const addScenarioForUser = async (userId: number, number: number, content: string) => {
     const client = supabase;
     if (!client) return;
-    const { error } = await client.from('post_scenarios').insert({ user_id: userId, scenario_number: number, content });
+    const { error } = await client.from('post_scenarios').insert({
+        user_id: userId,
+        scenario_number: number,
+        content: content
+    });
     if (error) handleError(error, 'addScenarioForUser');
 };
 
-export const deleteScenario = async (id: number): Promise<void> => {
+export const deleteScenario = async (id: number) => {
     const client = supabase;
     if (!client) return;
     const { error } = await client.from('post_scenarios').delete().eq('id', id);
     if (error) handleError(error, 'deleteScenario');
 };
 
+// --- Captions ---
+
 export const getCaptionsForUser = async (userId: number): Promise<Caption[]> => {
     const client = supabase;
     if (!client) return [];
-    const { data, error } = await client.from('captions').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+    const { data, error } = await client
+        .from('captions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
     if (error) handleError(error, 'getCaptionsForUser');
     return data || [];
 };
 
-export const addCaption = async (userId: number, title: string, content: string, originalScenario: string): Promise<void> => {
+export const addCaption = async (userId: number, title: string, content: string, originalContent: string) => {
     const client = supabase;
     if (!client) return;
-    const { error } = await client.from('captions').insert({ 
-        user_id: userId, 
-        title, 
-        content, 
-        original_scenario_content: originalScenario 
+    const { error } = await client.from('captions').insert({
+        user_id: userId,
+        title,
+        content,
+        original_scenario_content: originalContent
     });
     if (error) handleError(error, 'addCaption');
 };
 
+// --- Chat History ---
+
 export const getChatHistory = async (userId: number): Promise<ChatMessage[]> => {
     const client = supabase;
     if (!client) return [];
-    const { data, error } = await client.from('chat_history').select('*').eq('user_id', userId).single();
-    if (error && error.code !== 'PGRST116') handleError(error, 'getChatHistory'); // PGRST116 is no rows
-    return data?.messages || [];
+    const { data, error } = await client
+        .from('chat_history')
+        .select('messages')
+        .eq('user_id', userId)
+        .single();
+    
+    if (error && error.code !== 'PGRST116') {
+        console.warn("getChatHistory error", error);
+    }
+    
+    return (data?.messages as ChatMessage[]) || [];
 };
 
-export const saveChatHistory = async (userId: number, messages: ChatMessage[]): Promise<void> => {
+export const saveChatHistory = async (userId: number, messages: ChatMessage[]) => {
     const client = supabase;
     if (!client) return;
-    const { error } = await client.from('chat_history').upsert({ user_id: userId, messages });
+    
+    const { data } = await client.from('chat_history').select('user_id').eq('user_id', userId).single();
+    
+    let error;
+    if (data) {
+        const { error: err } = await client.from('chat_history').update({ messages }).eq('user_id', userId);
+        error = err;
+    } else {
+        const { error: err } = await client.from('chat_history').insert({ user_id: userId, messages });
+        error = err;
+    }
+    
     if (error) handleError(error, 'saveChatHistory');
 };
 
-export const deleteChatHistory = async (userId: number): Promise<void> => {
+export const deleteChatHistory = async (userId: number) => {
     const client = supabase;
     if (!client) return;
     const { error } = await client.from('chat_history').delete().eq('user_id', userId);
     if (error) handleError(error, 'deleteChatHistory');
 };
 
+// --- Ideas ---
+
 export const getIdeasForUser = async (userId: number): Promise<PostIdea[]> => {
     const client = supabase;
     if (!client) return [];
-    const { data, error } = await client.from('post_ideas').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+    const { data, error } = await client.from('post_ideas').select('*').eq('user_id', userId);
     if (error) handleError(error, 'getIdeasForUser');
     return data || [];
 };
 
-export const addIdeaForUser = async (userId: number, idea: string): Promise<void> => {
+export const addIdeaForUser = async (userId: number, ideaText: string) => {
     const client = supabase;
     if (!client) return;
-    const { error } = await client.from('post_ideas').insert({ user_id: userId, idea_text: idea });
+    const { error } = await client.from('post_ideas').insert({ user_id: userId, idea_text: ideaText });
     if (error) handleError(error, 'addIdeaForUser');
 };
 
-export const deleteIdea = async (id: number): Promise<void> => {
+export const deleteIdea = async (id: number) => {
     const client = supabase;
     if (!client) return;
     const { error } = await client.from('post_ideas').delete().eq('id', id);
     if (error) handleError(error, 'deleteIdea');
 };
 
+// --- Plans ---
+
 export const getPlansForUser = async (userId: number): Promise<Plan[]> => {
     const client = supabase;
     if (!client) return [];
-    const { data, error } = await client.from('plans').select('*').eq('user_id', userId).order('timestamp', { ascending: false });
+    const { data, error } = await client.from('plans').select('*').eq('user_id', userId).order('created_at', { ascending: false });
     if (error) handleError(error, 'getPlansForUser');
-    return data || [];
+    return data?.map((p: any) => ({ ...p, timestamp: p.created_at })) || [];
 };
 
-export const savePlanForUser = async (userId: number, content: string): Promise<void> => {
+export const savePlanForUser = async (userId: number, content: string) => {
     const client = supabase;
     if (!client) return;
-    const { error } = await client.from('plans').insert({ user_id: userId, content, timestamp: new Date().toISOString() });
+    const { error } = await client.from('plans').insert({ user_id: userId, content });
     if (error) handleError(error, 'savePlanForUser');
 };
 
-export const deletePlanById = async (id: number): Promise<void> => {
+export const deletePlanById = async (id: number) => {
     const client = supabase;
     if (!client) return;
     const { error } = await client.from('plans').delete().eq('id', id);
     if (error) handleError(error, 'deletePlanById');
 };
 
+// --- Reports ---
+
 export const getReportsForUser = async (userId: number): Promise<Report[]> => {
     const client = supabase;
     if (!client) return [];
-    const { data, error } = await client.from('reports').select('*').eq('user_id', userId).order('timestamp', { ascending: false });
+    const { data, error } = await client.from('reports').select('*').eq('user_id', userId).order('created_at', { ascending: false });
     if (error) handleError(error, 'getReportsForUser');
-    return data || [];
+    return data?.map((r: any) => ({ ...r, timestamp: r.created_at })) || [];
 };
 
-export const saveReportForUser = async (userId: number, content: string): Promise<void> => {
+export const saveReportForUser = async (userId: number, content: string) => {
     const client = supabase;
     if (!client) return;
-    const { error } = await client.from('reports').insert({ user_id: userId, content, timestamp: new Date().toISOString() });
+    const { error } = await client.from('reports').insert({ user_id: userId, content });
     if (error) handleError(error, 'saveReportForUser');
 };
 
-export const updateReportById = async (id: number, content: string): Promise<void> => {
+export const updateReportById = async (id: number, content: string) => {
     const client = supabase;
     if (!client) return;
     const { error } = await client.from('reports').update({ content }).eq('id', id);
     if (error) handleError(error, 'updateReportById');
 };
 
-export const deleteReportById = async (id: number): Promise<void> => {
+export const deleteReportById = async (id: number) => {
     const client = supabase;
     if (!client) return;
     const { error } = await client.from('reports').delete().eq('id', id);
     if (error) handleError(error, 'deleteReportById');
 };
+
+// --- Subscription ---
 
 export const getSubscriptionHistory = async (userId: number): Promise<SubscriptionHistory[]> => {
     const client = supabase;
@@ -399,56 +508,214 @@ export const getSubscriptionHistory = async (userId: number): Promise<Subscripti
     return data || [];
 };
 
-export const extendSubscription = async (userId: number, days: number): Promise<{success: boolean, message: string}> => {
+export const extendSubscription = async (userId: number, days: number) => {
     const client = supabase;
     if (!client) return { success: false, message: "DB Error" };
-    // Fetch current
+    
     const user = await getUserById(userId);
     if (!user) return { success: false, message: "User not found" };
 
     const currentExpiry = user.subscription_expires_at ? new Date(user.subscription_expires_at) : new Date();
-    // If expired, start from now
-    const startDate = currentExpiry < new Date() ? new Date() : currentExpiry;
-    startDate.setDate(startDate.getDate() + days);
-    const newExpiry = startDate.toISOString();
+    const baseDate = currentExpiry > new Date() ? currentExpiry : new Date();
+    baseDate.setDate(baseDate.getDate() + days);
+    
+    const newExpiry = baseDate.toISOString();
 
-    const { error } = await client.from('users').update({ 
-        subscription_expires_at: newExpiry,
-        is_subscription_expired: false 
-    }).eq('user_id', userId);
-    
-    if (error) return { success: false, message: error.message };
-    
-    // Log history
+    const { error: updateError } = await client.from('users').update({ subscription_expires_at: newExpiry }).eq('user_id', userId);
+    if (updateError) return { success: false, message: updateError.message };
+
     await client.from('subscription_history').insert({
         user_id: userId,
         extended_for_days: days,
         new_expiry_date: newExpiry
     });
 
-    return { success: true, message: `اشتراک با موفقیت ${days} روز تمدید شد.` };
+    return { success: true, message: "اشتراک تمدید شد." };
 };
 
-export const getCompetitorAnalysisHistory = async (userId: number): Promise<CompetitorAnalysisHistory[]> => {
+// --- Editor Tasks ---
+
+export const getEditorTasks = async (userId?: number): Promise<EditorTask[]> => {
     const client = supabase;
     if (!client) return [];
-    const { data, error } = await client.from('competitor_analysis').select('*').eq('user_id', userId).order('created_at', { ascending: false });
-    if (error) handleError(error, 'getCompetitorAnalysisHistory');
+    let query = client.from('editor_tasks').select('*').order('created_at', { ascending: false });
+    
+    if (userId) {
+        query = query.eq('assigned_editor_id', userId);
+    }
+    
+    const { data, error } = await query;
+    if (error) handleError(error, 'getEditorTasks');
     return data || [];
 };
 
-export const saveCompetitorAnalysisHistory = async (userId: number, data: any): Promise<void> => {
+export const createEditorTask = async (userId: number, content: string, scenarioNumber: number) => {
     const client = supabase;
     if (!client) return;
-    const { error } = await client.from('competitor_analysis').insert({ user_id: userId, ...data });
-    if (error) handleError(error, 'saveCompetitorAnalysisHistory');
+    const user = await getUserById(userId);
+    const { error } = await client.from('editor_tasks').insert({
+        client_user_id: userId,
+        client_name: user?.full_name,
+        scenario_content: content,
+        scenario_number: scenarioNumber,
+        status: 'pending_assignment'
+    });
+    if (error) handleError(error, 'createEditorTask');
 };
+
+export const createManualEditorTask = async (projectName: string, content: string, scenarioNumber: number, fileUrl?: string) => {
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('editor_tasks').insert({
+        manual_project_name: projectName,
+        client_name: projectName,
+        scenario_content: content + (fileUrl ? `\n\n[File]: ${fileUrl}` : ''),
+        scenario_number: scenarioNumber,
+        status: 'pending_assignment'
+    });
+    if (error) handleError(error, 'createManualEditorTask');
+};
+
+export const assignEditorTask = async (taskId: number, editorId: number, note: string) => {
+    const client = supabase;
+    if (!client) return;
+    const editor = await getUserById(editorId);
+    const { error } = await client.from('editor_tasks').update({
+        assigned_editor_id: editorId,
+        editor_name: editor?.full_name,
+        status: 'assigned',
+        admin_note: note
+    }).eq('id', taskId);
+    if (error) handleError(error, 'assignEditorTask');
+};
+
+export const updateEditorTaskStatus = async (taskId: number, status: string, note?: string) => {
+    const client = supabase;
+    if (!client) return;
+    const updateData: any = { status };
+    if (note) updateData.editor_note = note;
+    
+    const { error } = await client.from('editor_tasks').update(updateData).eq('id', taskId);
+    if (error) handleError(error, 'updateEditorTaskStatus');
+};
+
+// --- Production Events ---
+
+export const getProductionEvents = async (): Promise<ProductionEvent[]> => {
+    const client = supabase;
+    if (!client) return [];
+    const { data, error } = await client.from('production_events').select('*');
+    if (error) handleError(error, 'getProductionEvents');
+    return data || [];
+};
+
+export const getProductionEventsForUser = async (userFullName: string): Promise<ProductionEvent[]> => {
+    const client = supabase;
+    if (!client) return [];
+    const { data, error } = await client.from('production_events').select('*').eq('project_name', userFullName);
+    if (error) handleError(error, 'getProductionEventsForUser');
+    return data || [];
+};
+
+export const addProductionEvent = async (event: Partial<ProductionEvent>) => {
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('production_events').insert(event);
+    if (error) handleError(error, 'addProductionEvent');
+};
+
+export const updateProductionEvent = async (id: number, event: Partial<ProductionEvent>) => {
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('production_events').update(event).eq('id', id);
+    if (error) handleError(error, 'updateProductionEvent');
+};
+
+export const deleteProductionEvent = async (id: number) => {
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('production_events').delete().eq('id', id);
+    if (error) handleError(error, 'deleteProductionEvent');
+};
+
+// --- Checklist ---
+
+export const getAdminChecklist = async (userId: number): Promise<AdminChecklistItem[]> => {
+    const client = supabase;
+    if (!client) return [];
+    const { data, error } = await client.from('admin_checklist').select('*').eq('admin_id', userId).order('position', { ascending: true });
+    if (error) handleError(error, 'getAdminChecklist');
+    return data || [];
+};
+
+export const getDelegatedChecklistItems = async (userId: number): Promise<AdminChecklistItem[]> => {
+    const client = supabase;
+    if (!client) return [];
+    const { data, error } = await client.from('admin_checklist').select('*')
+        .or(`creator_id.eq.${userId},admin_id.eq.${userId}`);
+    if (error) handleError(error, 'getDelegatedChecklistItems');
+    return data || [];
+};
+
+export const getAdminUserIds = async (): Promise<Record<string, number>> => {
+    const client = supabase;
+    if (!client) return {};
+    const { data } = await client.from('users').select('user_id, full_name, role').in('role', ['admin', 'manager']);
+    
+    const ids: Record<string, number> = {};
+    if (data) {
+        data.forEach(u => {
+            const initial = u.full_name.charAt(0).toUpperCase();
+            if (!ids[initial]) ids[initial] = u.user_id;
+        });
+    }
+    return ids;
+};
+
+export const addAdminChecklistItem = async (adminId: number, title: string, isForToday: boolean, position: number, badge: string, creatorId: number) => {
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('admin_checklist').insert({
+        admin_id: adminId,
+        title,
+        is_for_today: isForToday,
+        position,
+        badge,
+        creator_id: creatorId,
+        is_done: false
+    });
+    if (error) handleError(error, 'addAdminChecklistItem');
+};
+
+export const updateAdminChecklistItem = async (id: number, updates: Partial<AdminChecklistItem>) => {
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('admin_checklist').update(updates).eq('id', id);
+    if (error) handleError(error, 'updateAdminChecklistItem');
+};
+
+export const deleteAdminChecklistItem = async (id: number) => {
+    const client = supabase;
+    if (!client) return;
+    const { error } = await client.from('admin_checklist').delete().eq('id', id);
+    if (error) handleError(error, 'deleteAdminChecklistItem');
+};
+
+export const updateAdminChecklistOrder = async (items: { id: number, position: number }[]) => {
+    const client = supabase;
+    if (!client) return;
+    for (const item of items) {
+        await client.from('admin_checklist').update({ position: item.position }).eq('id', item.id);
+    }
+};
+
+// --- Algorithm News ---
 
 export const getLatestAlgorithmNews = async (): Promise<AlgorithmNews | null> => {
     const client = supabase;
     if (!client) return null;
     const { data, error } = await client.from('algorithm_news').select('*').order('created_at', { ascending: false }).limit(1).single();
-    if (error && error.code !== 'PGRST116') handleError(error, 'getLatestAlgorithmNews');
+    if (error) return null;
     return data;
 };
 
@@ -460,122 +727,36 @@ export const getAlgorithmNewsHistory = async (limit: number): Promise<AlgorithmN
     return data || [];
 };
 
-export const addAlgorithmNews = async (content: string): Promise<void> => {
+export const addAlgorithmNews = async (content: string) => {
     const client = supabase;
     if (!client) return;
     const { error } = await client.from('algorithm_news').insert({ content });
     if (error) handleError(error, 'addAlgorithmNews');
 };
 
-export const getNotificationCounts = async (userId: number): Promise<any> => {
-    // Mock implementation or real query if tables exist
-    return { scenarios: 0, plans: 0, reports: 0 };
-};
+// --- Competitor Analysis ---
 
-export const clearUserNotifications = async (type: string, userId: number): Promise<void> => {
-    const client = supabase;
-    if (!client) return;
-};
-
-export const getAdminNotificationCounts = async (): Promise<any> => {
-    const client = supabase;
-    if (!client) return { ideas: 0, logs: 0, tasks: 0 };
-    const { count: ideas } = await client.from('post_ideas').select('*', { count: 'exact', head: true });
-    const { count: tasks } = await client.from('editor_tasks').select('*', { count: 'exact', head: true }).eq('status', 'pending_assignment');
-    return { ideas: ideas || 0, logs: 0, tasks: tasks || 0 };
-};
-
-export const clearAdminNotifications = async (type: string): Promise<void> => {
-    // No-op
-};
-
-
-// --- Editor Tasks ---
-
-export const createEditorTask = async (clientUserId: number, scenarioContent: string, scenarioNumber: number): Promise<void> => {
-    const client = supabase;
-    if (!client) return;
-    const { error } = await client.from('editor_tasks').insert({
-        client_user_id: clientUserId,
-        scenario_content: scenarioContent,
-        scenario_number: scenarioNumber,
-        status: 'pending_assignment',
-    });
-    if (error) handleError(error, 'createEditorTask');
-};
-
-export const createManualEditorTask = async (projectName: string, scenarioContent: string, scenarioNumber: number, fileUrl?: string): Promise<void> => {
-    const client = supabase;
-    if (!client) return;
-    
-    let content = scenarioContent;
-    if(fileUrl) {
-        content += `\n\n[فایل پیوست: ${fileUrl}]`;
-    }
-
-    const { error } = await client.from('editor_tasks').insert({
-        client_user_id: null,
-        manual_project_name: projectName,
-        scenario_content: content,
-        scenario_number: scenarioNumber,
-        status: 'pending_assignment',
-    });
-    if (error) handleError(error, 'createManualEditorTask');
-};
-
-export const getEditorTasks = async (userId?: number): Promise<EditorTask[]> => {
+export const getCompetitorAnalysisHistory = async (userId: number): Promise<CompetitorAnalysisHistory[]> => {
     const client = supabase;
     if (!client) return [];
-    let query = client
-        .from('editor_tasks')
-        .select(`
-            *,
-            client_name:client_user_id(full_name),
-            editor_name:assigned_editor_id(full_name)
-        `)
-        .order('created_at', { ascending: false });
-
-    if (userId) {
-        query = query.eq('assigned_editor_id', userId);
-    }
-
-    const { data, error } = await query;
-    if (error) {
-        handleError(error, 'getEditorTasks');
-        return [];
-    }
-    
-    return data.map((task: any) => ({
-        ...task,
-        client_name: task.client_name?.full_name || task.manual_project_name || 'کاربر/پروژه ناشناس',
-        editor_name: task.editor_name?.full_name || 'تعیین نشده'
-    }));
+    const { data, error } = await client.from('competitor_analysis').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+    if (error) handleError(error, 'getCompetitorAnalysisHistory');
+    return data || [];
 };
 
-export const updateEditorTaskStatus = async (id: number, status: string, note?: string): Promise<void> => {
+export const saveCompetitorAnalysisHistory = async (userId: number, data: any) => {
     const client = supabase;
     if (!client) return;
-    const updates: any = { status };
-    if (note) {
-        if (status === 'issue_reported') updates.editor_note = note;
-        else updates.admin_note = note;
-    }
-    const { error } = await client.from('editor_tasks').update(updates).eq('id', id);
-    if (error) handleError(error, 'updateEditorTaskStatus');
+    const { error } = await client.from('competitor_analysis').insert({ user_id: userId, ...data });
+    if (error) handleError(error, 'saveCompetitorAnalysisHistory');
 };
 
-export const assignEditorTask = async (taskId: number, editorId: number, note?: string): Promise<void> => {
-    const client = supabase;
-    if (!client) return;
-    const updates: any = { assigned_editor_id: editorId, status: 'assigned' };
-    if (note) updates.admin_note = note;
-    const { error } = await client.from('editor_tasks').update(updates).eq('id', taskId);
-    if (error) handleError(error, 'assignEditorTask');
-};
+// --- File Upload ---
 
 export const uploadFile = async (file: File): Promise<string | null> => {
     const client = supabase;
     if (!client) return null;
+    
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random()}.${fileExt}`;
     const filePath = `${fileName}`;
@@ -583,162 +764,10 @@ export const uploadFile = async (file: File): Promise<string | null> => {
     const { error: uploadError } = await client.storage.from('uploads').upload(filePath, file);
 
     if (uploadError) {
-        console.error(uploadError);
+        console.error('Upload Error:', uploadError);
         return null;
     }
 
     const { data } = client.storage.from('uploads').getPublicUrl(filePath);
     return data.publicUrl;
 };
-
-// --- Production Calendar ---
-
-export const getProductionEvents = async (): Promise<ProductionEvent[]> => {
-    const client = supabase;
-    if (!client) return [];
-    const { data, error } = await client.from('production_events').select('*').order('start_time', { ascending: true });
-    
-    if (error) {
-        handleError(error, 'getProductionEvents');
-        return [];
-    }
-    return data || [];
-};
-
-export const getProductionEventsForUser = async (userName: string): Promise<ProductionEvent[]> => {
-    const client = supabase;
-    if (!client) return [];
-    // Note: In a real app, linking by ID is better, but current schema uses name string
-    const { data, error } = await client
-        .from('production_events')
-        .select('*')
-        .eq('project_name', userName)
-        .order('start_time', { ascending: true });
-    
-    if (error) {
-        handleError(error, 'getProductionEventsForUser');
-        return [];
-    }
-    return data || [];
-};
-
-export const addProductionEvent = async (event: Omit<ProductionEvent, 'id' | 'created_at'>): Promise<void> => {
-    const client = supabase;
-    if (!client) return;
-    const { error } = await client.from('production_events').insert(event);
-    if (error) handleError(error, 'addProductionEvent');
-};
-
-export const updateProductionEvent = async (id: number, event: Partial<ProductionEvent>): Promise<void> => {
-    const client = supabase;
-    if (!client) return;
-    const { error } = await client.from('production_events').update(event).eq('id', id);
-    if (error) handleError(error, 'updateProductionEvent');
-};
-
-export const deleteProductionEvent = async (id: number): Promise<void> => {
-    const client = supabase;
-    if (!client) return;
-    const { error } = await client.from('production_events').delete().eq('id', id);
-    if (error) handleError(error, 'deleteProductionEvent');
-};
-
-// --- Admin Checklist ---
-
-export const getAdminChecklist = async (adminId: number): Promise<AdminChecklistItem[]> => {
-    const client = supabase;
-    if (!client) return [];
-    const { data, error } = await client
-        .from('admin_checklist')
-        .select('*')
-        .eq('admin_id', adminId)
-        .order('position', { ascending: true })
-        .order('created_at', { ascending: false });
-    
-    if (error) {
-        handleError(error, 'getAdminChecklist');
-        return [];
-    }
-    return data || [];
-};
-
-export const getDelegatedChecklistItems = async (userId: number): Promise<AdminChecklistItem[]> => {
-    const client = supabase;
-    if (!client) return [];
-    
-    const { data, error } = await client
-        .from('admin_checklist')
-        .select('*')
-        .or(`creator_id.eq.${userId},admin_id.eq.${userId}`)
-        .order('created_at', { ascending: false });
-    
-    if (error) {
-        handleError(error, 'getDelegatedChecklistItems');
-        return [];
-    }
-    
-    // Filter to ensure strictly delegated items (not self-created for self)
-    return data?.filter(item => item.creator_id !== item.admin_id) || [];
-};
-
-export const addAdminChecklistItem = async (adminId: number, title: string, isForToday: boolean, position: number, badge?: string, creatorId?: number): Promise<void> => {
-    const client = supabase;
-    if (!client) return;
-    const { error } = await client.from('admin_checklist').insert({
-        admin_id: adminId,
-        creator_id: creatorId,
-        title,
-        is_for_today: isForToday,
-        position,
-        badge // Added badge support
-    });
-    if (error) handleError(error, 'addAdminChecklistItem');
-};
-
-export const updateAdminChecklistItem = async (itemId: number, updates: Partial<AdminChecklistItem>): Promise<void> => {
-    const client = supabase;
-    if (!client) return;
-    const { error } = await client.from('admin_checklist').update(updates).eq('id', itemId);
-    if (error) handleError(error, 'updateAdminChecklistItem');
-};
-
-export const deleteAdminChecklistItem = async (itemId: number): Promise<void> => {
-    const client = supabase;
-    if (!client) return;
-    const { error } = await client.from('admin_checklist').delete().eq('id', itemId);
-    if (error) handleError(error, 'deleteAdminChecklistItem');
-};
-
-export const updateAdminChecklistOrder = async (updates: { id: number, position: number }[]): Promise<void> => {
-    const client = supabase;
-    if (!client) return;
-    
-    const promises = updates.map(update => 
-        client.from('admin_checklist').update({ position: update.position }).eq('id', update.id)
-    );
-    
-    await Promise.all(promises);
-};
-
-export const getAdminUserIds = async (): Promise<Record<string, number>> => {
-    const client = supabase;
-    if (!client) return {};
-    const { data, error } = await client
-        .from('users')
-        .select('user_id, access_code')
-        .in('role', ['admin', 'manager']); // Fetch all admins and managers
-    
-    if (error) {
-        handleError(error, 'getAdminUserIds');
-        return {};
-    }
-    
-    const mapping: Record<string, number> = {};
-    data?.forEach(user => {
-        // Map access codes to IDs for easier assignment logic
-        if(user.access_code === 'M77m') mapping['M'] = user.user_id;
-        if(user.access_code === 'Nil1') mapping['N'] = user.user_id;
-        if(user.access_code === 'Tm3') mapping['T'] = user.user_id;
-    });
-    return mapping;
-}

@@ -10,6 +10,9 @@ declare global {
       readonly LIARA_BASE_URL: string;
       readonly SUPABASE_URL: string;
       readonly SUPABASE_ANON_KEY: string;
+      readonly BOX_API_KEY: string;
+      readonly GAPGPT_API_KEY: string;
+      readonly GAPGPT_BASE_URL: string;
     }
   }
 
@@ -108,7 +111,8 @@ export interface User {
   preferred_name?: string; 
   story_requests: number;        
   caption_idea_requests?: number; 
-  chat_messages: number;         
+  chat_messages: number;
+  image_generation_requests?: number; // New field
   last_request_date: string;     
   last_weekly_reset_date?: string; 
   is_vip?: boolean;
@@ -117,6 +121,7 @@ export interface User {
   story_limit?: number;
   caption_idea_limit?: number;
   chat_limit?: number;
+  image_generation_limit?: number; // New field
 }
 
 export interface SubscriptionHistory {

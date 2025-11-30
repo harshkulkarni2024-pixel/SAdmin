@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { User } from '../../types';
 import { Icon } from '../common/Icon';
@@ -13,6 +14,7 @@ import AlgorithmNews from './AlgorithmNews';
 import CompetitorAnalysis from './CompetitorAnalysis';
 import LiveChat from './LiveChat';
 import SubscriptionStatus from './SubscriptionStatus';
+import StoryImageCreator from './StoryImageCreator'; // Import new component
 import * as db from '../../services/dbService';
 import { useUser } from '../../contexts/UserContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -21,9 +23,9 @@ interface UserViewProps {
   // Props are now handled by context
 }
 
-export type UserViewType = 'dashboard' | 'story' | 'post_scenario' | 'plans' | 'reports' | 'caption' | 'chat' | 'live_chat' | 'post_idea' | 'algorithm_news' | 'competitor_analysis';
+export type UserViewType = 'dashboard' | 'story' | 'post_scenario' | 'plans' | 'reports' | 'caption' | 'chat' | 'live_chat' | 'post_idea' | 'algorithm_news' | 'competitor_analysis' | 'story_image';
 
-const VALID_VIEWS: UserViewType[] = ['dashboard', 'story', 'post_scenario', 'plans', 'reports', 'caption', 'chat', 'live_chat', 'post_idea', 'algorithm_news', 'competitor_analysis'];
+const VALID_VIEWS: UserViewType[] = ['dashboard', 'story', 'post_scenario', 'plans', 'reports', 'caption', 'chat', 'live_chat', 'post_idea', 'algorithm_news', 'competitor_analysis', 'story_image'];
 
 const VIEW_NAMES: Record<UserViewType, string> = {
     dashboard: 'داشبورد',
@@ -37,6 +39,7 @@ const VIEW_NAMES: Record<UserViewType, string> = {
     post_idea: 'ارسال ایده',
     algorithm_news: 'اخبار الگوریتم',
     competitor_analysis: 'تحلیل رقبا',
+    story_image: 'ساخت استوری تصویری',
 };
 
 const VIP_VIEWS: UserViewType[] = ['post_scenario', 'plans', 'reports', 'post_idea'];
@@ -149,6 +152,8 @@ const UserView: React.FC<UserViewProps> = () => {
         return <CompetitorAnalysis />;
       case 'story':
         return <StoryGenerator />;
+      case 'story_image':
+        return <StoryImageCreator />;
       case 'post_scenario':
         return user.is_vip ? <PostScenarios setActiveView={handleViewChange} /> : <UserDashboard setActiveView={handleViewChange} />;
       case 'plans':
@@ -213,6 +218,7 @@ const UserView: React.FC<UserViewProps> = () => {
                   <NavItem view="chat" icon="chat" label="گفتگو با هوش مصنوعی" />
                   <NavItem view="live_chat" icon="phone-wave" label="گفتگوی زنده (بزودی)" />
                   <NavItem view="story" icon="scenario" label="سناریو استوری" />
+                  <NavItem view="story_image" icon="sparkles" label="ساخت استوری تصویری" />
                   <NavItem view="caption" icon="caption" label="کپشن‌ها" />
                   <NavItem view="competitor_analysis" icon="chart-bar" label="تحلیل رقبا" />
                   <NavItem view="algorithm_news" icon="broadcast" label="اخبار الگوریتم" />
