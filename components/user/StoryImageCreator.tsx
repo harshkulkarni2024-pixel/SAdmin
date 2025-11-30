@@ -12,9 +12,10 @@ const StoryImageCreator: React.FC = () => {
     const showNotification = useNotification();
     const [text, setText] = useState('');
     const [uploadedImage, setUploadedImage] = useState<{ data: string; mime: string; url: string; } | null>(null);
-    const [result, setResult] = useState('');
+    const [resultImageUrl, setResultImageUrl] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [detailedError, setDetailedError] = useState<string | null>(null); // New state for error
+    const [loadingStep, setLoadingStep] = useState('');
+    const [detailedError, setDetailedError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -28,7 +29,7 @@ const StoryImageCreator: React.FC = () => {
                     mime: file.type,
                     url: URL.createObjectURL(file)
                 });
-                setDetailedError(null); // Clear previous errors
+                setDetailedError(null);
             };
             reader.readAsDataURL(file);
         }
@@ -37,7 +38,7 @@ const StoryImageCreator: React.FC = () => {
     const handleGenerate = async () => {
         if (!user) return;
         setDetailedError(null);
-        setResult('');
+        setResultImageUrl('');
 
         if (!uploadedImage || !text.trim()) {
             showNotification('لطفاً هم عکس و هم متن را وارد کنید.', 'error');
@@ -53,107 +54,146 @@ const StoryImageCreator: React.FC = () => {
         }
 
         setIsLoading(true);
+        setLoadingStep('در حال آنالیز تصویر و طراحی سناریو...');
 
         try {
-            const content = await generateStoryImageContent(text, uploadedImage.data, uploadedImage.mime);
-            setResult(content);
+            // This function now returns an Image URL string
+            const url = await generateStoryImageContent(text, uploadedImage.data, uploadedImage.mime);
+            
+            setLoadingStep('در حال نهایی‌سازی...');
+            setResultImageUrl(url);
             
             await incrementUsage(user.user_id, 'image_generation');
-            await logActivity(user.user_id, 'استفاده از سرویس ساخت استوری تصویری');
+            await logActivity(user.user_id, 'ساخت تصویر استوری با DALL-E 3');
             updateUser();
-            showNotification('استوری با موفقیت طراحی شد!', 'success');
+            showNotification('تصویر با موفقیت ساخته شد!', 'success');
 
         } catch (error) {
             const msg = (error as Error).message;
-            setDetailedError(msg); // Show detail on screen
-            showNotification('خطا در ارتباط با هوش مصنوعی', 'error');
+            setDetailedError(msg);
+            showNotification('خطا در فرآیند ساخت تصویر', 'error');
         } finally {
             setIsLoading(false);
+            setLoadingStep('');
         }
     };
 
-    const formatText = (text: string) => {
-        return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br />');
+    const handleDownload = () => {
+        if (!resultImageUrl) return;
+        // Open in new tab is safest for CORS images
+        window.open(resultImageUrl, '_blank');
     };
 
     if (!user) return <Loader />;
 
     return (
         <div className="max-w-3xl mx-auto animate-fade-in">
-            <h1 className="text-3xl font-bold text-white mb-2">ساخت استوری تصویری</h1>
+            <h1 className="text-3xl font-bold text-white mb-2">ساخت استوری تصویری (DALL-E 3)</h1>
             <p className="text-slate-400 mb-6">
-                عکس و متن خود را ارسال کنید تا هوش مصنوعی یک استوری حرفه‌ای برای شما طراحی کند.
-                <span className="block text-xs mt-1 text-violet-400">باقی‌مانده امروز: {(user.image_generation_limit ?? 5) - (user.image_generation_requests ?? 0)} عدد</span>
+                عکس محصول یا سوژه خود را بفرستید تا یک استوری حرفه‌ای طراحی کنیم.
+                <span className="block text-xs mt-1 text-violet-400 font-mono">باقی‌مانده امروز: {(user.image_generation_limit ?? 5) - (user.image_generation_requests ?? 0)}</span>
             </p>
 
-            <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 mb-8">
+            <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 mb-8 shadow-xl">
                 <div className="space-y-6">
-                    {/* Error Display Box */}
+                    {/* Error Display */}
                     {detailedError && (
-                        <div className="bg-red-900/50 border border-red-500 rounded-lg p-4 mb-4 animate-shake">
+                        <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-4 animate-shake">
                             <div className="flex items-start gap-3">
                                 <Icon name="exclamation-triangle" className="w-6 h-6 text-red-400 flex-shrink-0 mt-1" />
                                 <div>
-                                    <h4 className="font-bold text-red-200 mb-1">خطا در پردازش درخواست</h4>
-                                    <p className="text-sm text-red-100 whitespace-pre-line leading-relaxed">{detailedError}</p>
+                                    <h4 className="font-bold text-red-200 mb-1">خطا در پردازش</h4>
+                                    <p className="text-sm text-red-200/80 whitespace-pre-line leading-relaxed dir-ltr text-left font-mono text-xs">{detailedError}</p>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* Image Upload */}
-                    <div 
-                        className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer transition-colors ${uploadedImage ? 'border-violet-500 bg-violet-500/10' : 'border-slate-600 hover:border-slate-500 hover:bg-slate-700/30'}`}
-                        onClick={() => fileInputRef.current?.click()}
-                    >
-                        <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
-                        {uploadedImage ? (
-                            <div className="relative">
-                                <img src={uploadedImage.url} alt="Preview" className="max-h-64 rounded-lg shadow-lg" />
-                                <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 hover:opacity-100 transition-opacity rounded-lg">
-                                    <span className="text-white font-bold">تغییر عکس</span>
+                    {/* Inputs Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Left: Image Upload */}
+                        <div 
+                            className={`border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all aspect-[4/5] overflow-hidden relative group ${uploadedImage ? 'border-violet-500 bg-slate-900' : 'border-slate-600 hover:border-slate-500 hover:bg-slate-700/30'}`}
+                            onClick={() => fileInputRef.current?.click()}
+                        >
+                            <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
+                            {uploadedImage ? (
+                                <>
+                                    <img src={uploadedImage.url} alt="Preview" className="w-full h-full object-cover" />
+                                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <span className="text-white font-bold flex items-center gap-2"><Icon name="refresh" className="w-5 h-5"/> تغییر عکس</span>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="text-center p-4">
+                                    <Icon name="upload" className="w-12 h-12 text-slate-400 mb-3 mx-auto" />
+                                    <span className="text-slate-300 font-medium block">آپلود عکس</span>
+                                    <span className="text-xs text-slate-500 mt-2 block">برای شروع کلیک کنید</span>
                                 </div>
+                            )}
+                        </div>
+
+                        {/* Right: Text & Action */}
+                        <div className="flex flex-col gap-4">
+                            <div className="flex-1">
+                                <label className="block text-sm font-medium text-slate-300 mb-2">توضیحات استوری</label>
+                                <textarea 
+                                    value={text}
+                                    onChange={(e) => setText(e.target.value)}
+                                    placeholder="مثلاً: این محصول جدید ماست، یک استوری مینیمال و شیک با تم مشکی طلایی بساز..."
+                                    className="w-full h-full min-h-[150px] p-4 bg-slate-900 border border-slate-600 rounded-xl text-white focus:ring-2 focus:ring-violet-500 outline-none resize-none transition-shadow"
+                                />
                             </div>
-                        ) : (
-                            <>
-                                <Icon name="upload" className="w-12 h-12 text-slate-400 mb-3" />
-                                <span className="text-slate-300 font-medium">برای آپلود عکس کلیک کنید</span>
-                            </>
-                        )}
+                            
+                            <button 
+                                onClick={handleGenerate}
+                                disabled={isLoading || !uploadedImage || !text.trim()}
+                                className="w-full py-4 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-violet-500/25 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isLoading ? <Loader /> : <>
+                                    <Icon name="sparkles" className="w-6 h-6" />
+                                    ساخت تصویر (DALL-E 3)
+                                </>}
+                            </button>
+                        </div>
                     </div>
-
-                    {/* Text Input */}
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">متن استوری شما</label>
-                        <textarea 
-                            value={text}
-                            onChange={(e) => setText(e.target.value)}
-                            placeholder="متنی که می‌خواهید در استوری نوشته شود یا توضیحی در مورد عکس..."
-                            className="w-full h-32 p-4 bg-slate-900 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-violet-500 outline-none resize-none"
-                        />
-                    </div>
-
-                    <button 
-                        onClick={handleGenerate}
-                        disabled={isLoading || !uploadedImage || !text.trim()}
-                        className="w-full py-3 bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2 disabled:bg-slate-600 disabled:cursor-not-allowed"
-                    >
-                        {isLoading ? <Loader /> : <>
-                            <Icon name="sparkles" className="w-5 h-5" />
-                            طراحی استوری
-                        </>}
-                    </button>
+                    
+                    {isLoading && (
+                        <div className="text-center text-violet-300 text-sm animate-pulse">
+                            {loadingStep}
+                        </div>
+                    )}
                 </div>
             </div>
 
-            {/* Result */}
-            {result && (
-                <div className="bg-slate-800 p-6 rounded-xl border border-violet-500/50 shadow-lg animate-slide-up">
-                    <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                        <Icon name="check-circle" className="w-6 h-6 text-green-400" />
-                        نتیجه طراحی
-                    </h2>
-                    <div className="prose prose-invert prose-p:text-slate-300 prose-strong:text-white max-w-none whitespace-pre-wrap bg-slate-900/50 p-4 rounded-lg" dangerouslySetInnerHTML={{ __html: formatText(result) }} />
+            {/* Result Area */}
+            {resultImageUrl && (
+                <div className="bg-slate-800 p-6 rounded-xl border border-violet-500/50 shadow-2xl animate-slide-up mb-10">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                            <Icon name="check-circle" className="w-6 h-6 text-green-400" />
+                            نتیجه نهایی
+                        </h2>
+                        <button 
+                            onClick={handleDownload}
+                            className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors"
+                        >
+                            <Icon name="upload" className="w-4 h-4 rotate-180" />
+                            دانلود / مشاهده کامل
+                        </button>
+                    </div>
+                    
+                    <div className="relative rounded-lg overflow-hidden border border-slate-700 bg-black flex justify-center">
+                        <img 
+                            src={resultImageUrl} 
+                            alt="Generated Story" 
+                            className="max-w-full max-h-[600px] object-contain"
+                            loading="lazy"
+                        />
+                    </div>
+                    <p className="text-center text-xs text-slate-500 mt-3">
+                        نکته: لینک تصویر موقت است (معمولاً ۱ ساعت). لطفاً آن را دانلود کنید.
+                    </p>
                 </div>
             )}
         </div>

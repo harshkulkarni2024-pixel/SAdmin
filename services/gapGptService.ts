@@ -1,12 +1,12 @@
 
 const GAPGPT_API_KEY = process.env.GAPGPT_API_KEY;
-const GAPGPT_BASE_URL = process.env.GAPGPT_BASE_URL || 'https://api.gapgpt.ir/v1'; // Default backup if not set
+const GAPGPT_BASE_URL = process.env.GAPGPT_BASE_URL || 'https://api.gapgpt.ir/v1';
 
 export const GAPGPT_INIT_ERROR = `خطای حیاتی: کلید API برای سرویس GapGPT پیدا نشد! 🔑
 
 این بخش برای کارکرد صحیح نیاز به تنظیم کلید API در فایل .env یا تنظیمات هاست دارد.`;
 
-interface GapGptResponse {
+interface ChatResponse {
     choices: Array<{
         message: {
             content: string;
@@ -14,23 +14,78 @@ interface GapGptResponse {
     }>
 }
 
-export const generateStoryImageContent = async (userText: string, imageBase64: string, imageMime: string): Promise<string> => {
-    if (!GAPGPT_API_KEY) {
-        throw new Error(GAPGPT_INIT_ERROR);
+interface ImageResponse {
+    created: number;
+    data: Array<{
+        url: string;
+        revised_prompt?: string;
+    }>;
+    error?: {
+        message: string;
+        type: string;
+        code: string;
     }
+}
 
+// Helper for standard fetches
+async function fetchGapGpt(endpoint: string, body: any) {
+    if (!GAPGPT_API_KEY) throw new Error(GAPGPT_INIT_ERROR);
+
+    try {
+        const response = await fetch(`${GAPGPT_BASE_URL}${endpoint}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${GAPGPT_API_KEY}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(body)
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            let errorMessage = `خطای سمت سرور (${response.status})`;
+            try {
+                const errorJson = JSON.parse(errorText);
+                if (errorJson.error?.message) {
+                    errorMessage += `: ${errorJson.error.message}`;
+                }
+            } catch (e) { /* ignore parse error */ }
+            throw new Error(errorMessage);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("GapGPT Network Error:", error);
+        if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+            throw new Error(`خطای ارتباط با سرور (Failed to fetch).
+            
+1. لطفاً VPN خود را بررسی کنید (برخی سرورهای ایرانی با VPN مشکل دارند).
+2. مشکل CORS: مرورگر اجازه درخواست مستقیم به ${GAPGPT_BASE_URL} را نمی‌دهد.
+3. آدرس API اشتباه است.`);
+        }
+        throw error;
+    }
+}
+
+// Step 1: Generate a prompt for DALL-E using Gemini Vision
+async function generateDallePrompt(userText: string, imageBase64: string, imageMime: string): Promise<string> {
     const prompt = `
-    وظیفه تو این است که به عنوان یک متخصص تولید محتوای اینستاگرام عمل کنی.
-    کاربر یک عکس و یک متن ارسال کرده است.
-    بر اساس این عکس و متن، یک استوری اینستاگرام جذاب، خلاقانه و حرفه‌ای طراحی کن.
+    You are an expert Instagram Story Designer and Prompt Engineer.
+    The user has provided an image and a text request.
     
-    خروجی تو باید شامل موارد زیر باشد:
-    1. متن اصلی استوری (کوتاه و جذاب).
-    2. پیشنهاد برای استیکر یا گیف مناسب.
-    3. پیشنهاد برای رنگ‌بندی پس‌زمینه یا فونت.
-    4. اگر نیاز به موسیقی است، یک سبک موسیقی پیشنهاد بده.
+    User Text: "${userText}"
     
-    متن کاربر: "${userText}"
+    YOUR TASK:
+    Analyze the user's image and text. Then, write a highly detailed, professional English prompt for DALL-E 3 to generate an Instagram Story background/image that fits the user's request.
+    
+    The prompt should describe:
+    - The subject (based on user image/text)
+    - The style (Modern, Minimalist, Vibrant, etc.)
+    - Composition (9:16 aspect ratio suitable for Stories)
+    - Lighting and Color Palette
+    - Text overlay placement (leave space for text)
+    
+    Output ONLY the English prompt string. Do not add any conversational text.
     `;
 
     const messages = [
@@ -40,67 +95,60 @@ export const generateStoryImageContent = async (userText: string, imageBase64: s
                 { type: "text", text: prompt },
                 {
                     type: "image_url",
-                    image_url: {
-                        url: `data:${imageMime};base64,${imageBase64}`
-                    }
+                    image_url: { url: `data:${imageMime};base64,${imageBase64}` }
                 }
             ]
         }
     ];
 
-    try {
-        console.log("Sending request to GapGPT:", `${GAPGPT_BASE_URL}/chat/completions`);
-        
-        const response = await fetch(`${GAPGPT_BASE_URL}/chat/completions`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${GAPGPT_API_KEY}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                model: "gemini-3-pro-image-preview",
-                messages: messages,
-                max_tokens: 1000
-            })
-        });
+    const data: ChatResponse = await fetchGapGpt('/chat/completions', {
+        model: "gemini-3-pro-image-preview", // Used for vision analysis
+        messages: messages,
+        max_tokens: 500
+    });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            let errorMessage = `خطای سمت سرور (${response.status})`;
-            try {
-                const errorJson = JSON.parse(errorText);
-                if (errorJson.error && errorJson.error.message) {
-                    errorMessage += `: ${errorJson.error.message}`;
-                } else {
-                    errorMessage += `: ${errorText}`;
-                }
-            } catch (e) {
-                errorMessage += `: ${errorText}`;
-            }
-            throw new Error(errorMessage);
-        }
-
-        const data: GapGptResponse = await response.json();
-        if (!data.choices || data.choices.length === 0 || !data.choices[0].message) {
-            throw new Error("پاسخ نامعتبر از سرویس هوش مصنوعی (ساختار JSON صحیح نیست).");
-        }
-        return data.choices[0].message.content;
-
-    } catch (error) {
-        console.error("GapGPT Service Error:", error);
-        
-        // Handle "Failed to fetch" specifically
-        if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-            throw new Error(`خطای ارتباط با سرور (Failed to fetch). 
-            
-دلایل احتمالی:
-1. مشکل اینترنت یا VPN (لطفاً VPN را تغییر دهید یا خاموش کنید).
-2. مشکل CORS: مرورگر اجازه درخواست مستقیم به آدرس ${GAPGPT_BASE_URL} را نمی‌دهد.
-3. آدرس API اشتباه وارد شده است.
-
-اگر توسعه‌دهنده هستید: کنسول مرورگر (F12) را برای جزئیات دقیق‌تر بررسی کنید.`);
-        }
-
-        throw error;
+    if (!data.choices?.[0]?.message?.content) {
+        throw new Error("تولید پرامپت تصویر با مشکل مواجه شد.");
     }
+
+    return data.choices[0].message.content.trim();
+}
+
+// Main Function
+export const generateStoryImageContent = async (userText: string, imageBase64: string, imageMime: string): Promise<string> => {
+    // 1. Generate Prompt
+    console.log("Generating prompt...");
+    const dallePrompt = await generateDallePrompt(userText, imageBase64, imageMime);
+    console.log("Prompt generated:", dallePrompt);
+
+    // 2. Generate Image using DALL-E 3
+    console.log("Generating image with DALL-E 3...");
+    
+    // Note: DALL-E 3 usually uses /images/generations endpoint
+    const imageResponse: ImageResponse = await fetchGapGpt('/images/generations', {
+        model: "dall-e-3",
+        prompt: dallePrompt,
+        n: 1,
+        size: "1024x1792", // Vertical for stories (if supported by provider, else 1024x1024)
+        // Fallback size if 1024x1792 fails: "1024x1024"
+        response_format: "url"
+    }).catch(async (err) => {
+        // Fallback for size error (common with some proxies)
+        if (err.message.includes('size')) {
+            console.warn("Retrying with square size...");
+            return await fetchGapGpt('/images/generations', {
+                model: "dall-e-3",
+                prompt: dallePrompt,
+                n: 1,
+                size: "1024x1024"
+            });
+        }
+        throw err;
+    });
+
+    if (!imageResponse.data?.[0]?.url) {
+        throw new Error("تصویر تولید شد اما لینکی دریافت نشد.");
+    }
+
+    return imageResponse.data[0].url;
 };
