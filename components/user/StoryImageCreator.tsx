@@ -54,13 +54,13 @@ const StoryImageCreator: React.FC = () => {
         }
 
         setIsLoading(true);
-        setLoadingStep('در حال آنالیز تصویر و طراحی سناریو...');
+        setLoadingStep('در حال ارسال به Gemini 3 Pro...');
 
         try {
-            // This function now uses chat endpoint to request image URL
+            // Direct call using the specific model requested
             const url = await generateStoryImageContent(text, uploadedImage.data, uploadedImage.mime);
             
-            setLoadingStep('در حال نهایی‌سازی...');
+            setLoadingStep('در حال دریافت تصویر...');
             
             // Basic URL validation
             if (!url.startsWith('http')) {
