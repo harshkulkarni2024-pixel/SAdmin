@@ -14,19 +14,6 @@ interface ChatResponse {
     }>
 }
 
-interface ImageResponse {
-    created: number;
-    data: Array<{
-        url: string;
-        revised_prompt?: string;
-    }>;
-    error?: {
-        message: string;
-        type: string;
-        code: string;
-    }
-}
-
 // Helper for standard fetches
 async function fetchGapGpt(endpoint: string, body: any) {
     if (!GAPGPT_API_KEY) throw new Error(GAPGPT_INIT_ERROR);
@@ -70,21 +57,12 @@ async function fetchGapGpt(endpoint: string, body: any) {
 // Step 1: Generate a prompt using Gemini Vision
 async function generateImagePrompt(userText: string, imageBase64: string, imageMime: string): Promise<string> {
     const prompt = `
-    You are an expert Instagram Story Designer and Prompt Engineer.
-    The user has provided an image and a text request.
-    
+    Analyze the user's image and text.
     User Text: "${userText}"
     
-    YOUR TASK:
-    Analyze the user's image and text. Then, write a detailed English prompt for an AI image generator (specifically Gemini 3 Pro Image) to create an Instagram Story background/image.
-    
-    The prompt should describe:
-    - The subject (based on user image/text)
-    - The style (Modern, Minimalist, Vibrant, etc.)
-    - Composition (9:16 aspect ratio suitable for Stories)
-    - Lighting and Color Palette
-    
-    Output ONLY the English prompt string. Do not add any conversational text.
+    Create a highly detailed English prompt for an AI image generator to create a stunning Instagram Story background.
+    The prompt should specify: Subject, Style (Modern/Minimalist), Colors, Lighting.
+    Output ONLY the prompt string.
     `;
 
     const messages = [
@@ -101,16 +79,12 @@ async function generateImagePrompt(userText: string, imageBase64: string, imageM
     ];
 
     const data: ChatResponse = await fetchGapGpt('/chat/completions', {
-        model: "gemini-3-pro-image-preview", // Used for vision analysis
+        model: "gemini-3-pro-image-preview",
         messages: messages,
-        max_tokens: 500
+        max_tokens: 300
     });
 
-    if (!data.choices?.[0]?.message?.content) {
-        throw new Error("تولید پرامپت تصویر با مشکل مواجه شد.");
-    }
-
-    return data.choices[0].message.content.trim();
+    return data.choices[0]?.message?.content?.trim() || userText;
 }
 
 // Main Function
@@ -120,32 +94,41 @@ export const generateStoryImageContent = async (userText: string, imageBase64: s
     const imagePrompt = await generateImagePrompt(userText, imageBase64, imageMime);
     console.log("Prompt generated:", imagePrompt);
 
-    // 2. Generate Image using Gemini 3 Pro Image
-    console.log("Generating image with Gemini 3 Pro...");
+    // 2. Generate Image using Chat Endpoint (Instruction following)
+    // Some providers map image generation models to chat endpoints where you ask for the image.
+    console.log("Generating image with Gemini 3 Pro (via Chat)...");
     
-    const imageResponse: ImageResponse = await fetchGapGpt('/images/generations', {
-        model: "gemini-3-pro-image-preview",
-        prompt: imagePrompt,
-        n: 1,
-        size: "1024x1792", // Vertical for stories (if supported, else 1024x1024)
-        response_format: "url"
-    }).catch(async (err) => {
-        // Fallback for size error
-        if (err.message.includes('size')) {
-            console.warn("Retrying with square size...");
-            return await fetchGapGpt('/images/generations', {
-                model: "gemini-3-pro-image-preview",
-                prompt: imagePrompt,
-                n: 1,
-                size: "1024x1024"
-            });
+    const messages = [
+        {
+            role: "user",
+            content: `Generate an image based on this description: ${imagePrompt}.
+            
+            IMPORTANT: Return ONLY the direct URL of the generated image. Do not include any explanation or markdown.`
         }
-        throw err;
+    ];
+
+    const data: ChatResponse = await fetchGapGpt('/chat/completions', {
+        model: "gemini-3-pro-image-preview",
+        messages: messages
     });
 
-    if (!imageResponse.data?.[0]?.url) {
-        throw new Error("تصویر تولید شد اما لینکی دریافت نشد.");
+    const content = data.choices?.[0]?.message?.content;
+    
+    if (!content) {
+        throw new Error("پاسخ نامعتبر از سرویس هوش مصنوعی.");
     }
 
-    return imageResponse.data[0].url;
+    // Try to extract URL if the model was chatty
+    const urlMatch = content.match(/https?:\/\/[^\s)"]+/);
+    if (urlMatch) {
+        return urlMatch[0];
+    }
+
+    // If no URL found, it might be an error message or description
+    if (!content.startsWith('http')) {
+        console.warn("Model returned text instead of URL:", content);
+        throw new Error("مدل به جای تصویر، متن بازگرداند. لطفاً دوباره تلاش کنید.");
+    }
+
+    return content;
 };

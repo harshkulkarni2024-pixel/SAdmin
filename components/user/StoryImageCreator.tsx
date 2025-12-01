@@ -57,10 +57,16 @@ const StoryImageCreator: React.FC = () => {
         setLoadingStep('در حال آنالیز تصویر و طراحی سناریو...');
 
         try {
-            // This function now returns an Image URL string using Gemini 3 Pro
+            // This function now uses chat endpoint to request image URL
             const url = await generateStoryImageContent(text, uploadedImage.data, uploadedImage.mime);
             
             setLoadingStep('در حال نهایی‌سازی...');
+            
+            // Basic URL validation
+            if (!url.startsWith('http')) {
+                throw new Error("خروجی معتبر تصویری دریافت نشد.");
+            }
+
             setResultImageUrl(url);
             
             await incrementUsage(user.user_id, 'image_generation');
@@ -80,7 +86,6 @@ const StoryImageCreator: React.FC = () => {
 
     const handleDownload = () => {
         if (!resultImageUrl) return;
-        // Open in new tab is safest for CORS images
         window.open(resultImageUrl, '_blank');
     };
 
