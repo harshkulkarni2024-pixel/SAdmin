@@ -57,14 +57,14 @@ const StoryImageCreator: React.FC = () => {
         setLoadingStep('در حال آنالیز تصویر و طراحی سناریو...');
 
         try {
-            // This function now returns an Image URL string
+            // This function now returns an Image URL string using Gemini 3 Pro
             const url = await generateStoryImageContent(text, uploadedImage.data, uploadedImage.mime);
             
             setLoadingStep('در حال نهایی‌سازی...');
             setResultImageUrl(url);
             
             await incrementUsage(user.user_id, 'image_generation');
-            await logActivity(user.user_id, 'ساخت تصویر استوری با DALL-E 3');
+            await logActivity(user.user_id, 'ساخت تصویر استوری با Gemini 3 Pro');
             updateUser();
             showNotification('تصویر با موفقیت ساخته شد!', 'success');
 
@@ -88,7 +88,7 @@ const StoryImageCreator: React.FC = () => {
 
     return (
         <div className="max-w-3xl mx-auto animate-fade-in">
-            <h1 className="text-3xl font-bold text-white mb-2">ساخت استوری تصویری (DALL-E 3)</h1>
+            <h1 className="text-3xl font-bold text-white mb-2">ساخت استوری تصویری (Gemini 3 Pro)</h1>
             <p className="text-slate-400 mb-6">
                 عکس محصول یا سوژه خود را بفرستید تا یک استوری حرفه‌ای طراحی کنیم.
                 <span className="block text-xs mt-1 text-violet-400 font-mono">باقی‌مانده امروز: {(user.image_generation_limit ?? 5) - (user.image_generation_requests ?? 0)}</span>
@@ -152,7 +152,7 @@ const StoryImageCreator: React.FC = () => {
                             >
                                 {isLoading ? <Loader /> : <>
                                     <Icon name="sparkles" className="w-6 h-6" />
-                                    ساخت تصویر (DALL-E 3)
+                                    ساخت تصویر (Gemini 3 Pro)
                                 </>}
                             </button>
                         </div>

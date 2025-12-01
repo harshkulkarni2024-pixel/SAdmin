@@ -67,8 +67,8 @@ async function fetchGapGpt(endpoint: string, body: any) {
     }
 }
 
-// Step 1: Generate a prompt for DALL-E using Gemini Vision
-async function generateDallePrompt(userText: string, imageBase64: string, imageMime: string): Promise<string> {
+// Step 1: Generate a prompt using Gemini Vision
+async function generateImagePrompt(userText: string, imageBase64: string, imageMime: string): Promise<string> {
     const prompt = `
     You are an expert Instagram Story Designer and Prompt Engineer.
     The user has provided an image and a text request.
@@ -76,14 +76,13 @@ async function generateDallePrompt(userText: string, imageBase64: string, imageM
     User Text: "${userText}"
     
     YOUR TASK:
-    Analyze the user's image and text. Then, write a highly detailed, professional English prompt for DALL-E 3 to generate an Instagram Story background/image that fits the user's request.
+    Analyze the user's image and text. Then, write a detailed English prompt for an AI image generator (specifically Gemini 3 Pro Image) to create an Instagram Story background/image.
     
     The prompt should describe:
     - The subject (based on user image/text)
     - The style (Modern, Minimalist, Vibrant, etc.)
     - Composition (9:16 aspect ratio suitable for Stories)
     - Lighting and Color Palette
-    - Text overlay placement (leave space for text)
     
     Output ONLY the English prompt string. Do not add any conversational text.
     `;
@@ -118,27 +117,25 @@ async function generateDallePrompt(userText: string, imageBase64: string, imageM
 export const generateStoryImageContent = async (userText: string, imageBase64: string, imageMime: string): Promise<string> => {
     // 1. Generate Prompt
     console.log("Generating prompt...");
-    const dallePrompt = await generateDallePrompt(userText, imageBase64, imageMime);
-    console.log("Prompt generated:", dallePrompt);
+    const imagePrompt = await generateImagePrompt(userText, imageBase64, imageMime);
+    console.log("Prompt generated:", imagePrompt);
 
-    // 2. Generate Image using DALL-E 3
-    console.log("Generating image with DALL-E 3...");
+    // 2. Generate Image using Gemini 3 Pro Image
+    console.log("Generating image with Gemini 3 Pro...");
     
-    // Note: DALL-E 3 usually uses /images/generations endpoint
     const imageResponse: ImageResponse = await fetchGapGpt('/images/generations', {
-        model: "dall-e-3",
-        prompt: dallePrompt,
+        model: "gemini-3-pro-image-preview",
+        prompt: imagePrompt,
         n: 1,
-        size: "1024x1792", // Vertical for stories (if supported by provider, else 1024x1024)
-        // Fallback size if 1024x1792 fails: "1024x1024"
+        size: "1024x1792", // Vertical for stories (if supported, else 1024x1024)
         response_format: "url"
     }).catch(async (err) => {
-        // Fallback for size error (common with some proxies)
+        // Fallback for size error
         if (err.message.includes('size')) {
             console.warn("Retrying with square size...");
             return await fetchGapGpt('/images/generations', {
-                model: "dall-e-3",
-                prompt: dallePrompt,
+                model: "gemini-3-pro-image-preview",
+                prompt: imagePrompt,
                 n: 1,
                 size: "1024x1024"
             });
